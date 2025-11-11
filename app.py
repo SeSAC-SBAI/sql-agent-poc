@@ -74,7 +74,8 @@ with col2:
 # 대화 기록 표시
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        # 모두 plain text로 표시
+        st.write(message["content"])
         
         if "sql_queries" in message and message["sql_queries"]:
             with st.expander("📝 실행된 SQL 쿼리"):
@@ -106,7 +107,8 @@ if question:
     })
     
     with st.chat_message("user"):
-        st.markdown(question)
+        # plain text로 표시
+        st.write(question)
     
     # Agent 응답
     with st.chat_message("assistant"):
@@ -118,7 +120,7 @@ if question:
                 sql_queries = result.get("sql_queries", [])
                 steps = result.get("steps", [])
                 
-                # 답변 표시
+                # 답변 표시 (plain text)
                 st.success(answer)
                 
                 # SQL 쿼리 표시
