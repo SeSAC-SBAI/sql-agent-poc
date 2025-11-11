@@ -111,13 +111,13 @@ class SQLAgentManager:
         """
         sql_queries = []
         
-        # sql_db_query 호출 부분 찾기
-        pattern = r"Invoking: `sql_db_query` with `\{'query': ['\"](.+?)['\"]"
-        matches = re.findall(pattern, logs, re.DOTALL)
+        # SELECT로 시작해서 ;로 끝나는 부분 찾기 (대소문자 무시)
+        pattern = r'(SELECT\s+.+?;)'
+        matches = re.findall(pattern, logs, re.IGNORECASE | re.DOTALL)
         
         for match in matches:
-            # 이스케이프 문자 처리
-            sql = match.replace('\\n', '\n').replace("\\'", "'").strip()
+            # 공백 정리
+            sql = ' '.join(match.split())
             if sql and sql not in sql_queries:
                 sql_queries.append(sql)
         
