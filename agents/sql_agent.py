@@ -2,6 +2,9 @@
 SQL Agent 생성 및 관리 모듈
 """
 
+import re
+import sys
+from io import StringIO
 from langchain_upstage import ChatUpstage
 from langchain_community.agent_toolkits import create_sql_agent
 from config import settings
@@ -91,11 +94,34 @@ class SQLAgentManager:
             handle_parsing_errors=True,
             extra_tools=[search_table_metadata],
             prefix=system_prefix + "\n\n" + system_suffix,
-            return_intermediate_steps=True,  # 중간 단계 반환 활성화
         )
         print("SQL Agent 생성 완료 (메타데이터 검색 도구 포함)")
 
         return self.agent
+
+    def extract_sql_from_logs(self, logs: str) -> list:
+        """
+        verbose 로그에서 SQL 쿼리 추출
+        
+        Args:
+            logs: 캡처된 로그 문자열
+            
+        Returns:
+            추출된 SQL 쿼리 리스트
+        """
+        sql_queries = []
+        
+        # sql_db_query 호출 부분 찾기
+        pattern = r"Invoking: `sql_db_query` with `\{'query': ['\"](.+?)['\"]"
+        matches = re.findall(pattern, logs, re.DOTALL)
+        
+        for match in matches:
+            # 이스케이프 문자 처리
+            sql = match.replace('\\n', '\n').replace("\\'", "'").strip()
+            if sql and sql not in sql_queries:
+                sql_queries.append(sql)
+        
+        return sql_queries
 
     def query(self, question: str) -> dict:
         """
@@ -109,7 +135,6 @@ class SQLAgentManager:
                 "question": 질문,
                 "answer": 답변,
                 "sql_queries": 실행된 SQL 쿼리 리스트,
-                "steps": 처리 단계,
                 "success": 성공 여부,
                 "error": 에러 메시지 (있을 경우)
             }
@@ -122,79 +147,27 @@ class SQLAgentManager:
             print(f"질문: {question}")
             print(f"{'='*60}")
 
-            # include_run_info=True로 중간 단계 포함
-            result = self.agent.invoke(
-                {"input": question},
-                config={"callbacks": [], "run_name": "SQL Query"},
-                return_only_outputs=False
-            )
-
-            # 디버그 프린트
-            print(f"\n=== DEBUG ===")
-            print(f"result keys: {result.keys()}")
-            print(f"intermediate_steps 존재: {'intermediate_steps' in result}")
+            # stdout 캡처
+            old_stdout = sys.stdout
+            sys.stdout = captured_output = StringIO()
             
-            if 'intermediate_steps' in result:
-                steps_data = result['intermediate_steps']
-                print(f"intermediate_steps 타입: {type(steps_data)}")
-                print(f"intermediate_steps 개수: {len(steps_data)}")
+            try:
+                result = self.agent.invoke({"input": question})
+            finally:
+                # stdout 복원
+                sys.stdout = old_stdout
+                logs = captured_output.getvalue()
                 
-                for i, step in enumerate(steps_data):
-                    print(f"\n--- Step {i} ---")
-                    print(f"Step 타입: {type(step)}")
-                    print(f"Step 길이: {len(step) if hasattr(step, '__len__') else 'N/A'}")
-                    
-                    if isinstance(step, tuple) and len(step) >= 1:
-                        action = step[0]
-                        print(f"Action: {action}")
-                        print(f"Action 타입: {type(action)}")
-                        
-                        # 여러 방법으로 tool 정보 추출 시도
-                        tool_name = None
-                        tool_input = None
-                        
-                        if hasattr(action, 'tool'):
-                            tool_name = action.tool
-                        elif hasattr(action, 'tool_name'):
-                            tool_name = action.tool_name
-                            
-                        if hasattr(action, 'tool_input'):
-                            tool_input = action.tool_input
-                            
-                        print(f"Tool name: {tool_name}")
-                        print(f"Tool input: {tool_input}")
+                # 로그 출력 (콘솔에 표시)
+                print(logs)
             
-            print(f"=== DEBUG END ===\n")
-
             # SQL 쿼리 추출
-            sql_queries = []
-            steps = []
-            
-            if "intermediate_steps" in result:
-                for step in result["intermediate_steps"]:
-                    if len(step) >= 2:
-                        action, observation = step[0], step[1]
-                        
-                        # 도구 이름과 입력 저장
-                        tool_name = getattr(action, 'tool', 'unknown')
-                        tool_input = getattr(action, 'tool_input', {})
-                        
-                        steps.append({
-                            "tool": tool_name,
-                            "input": tool_input
-                        })
-                        
-                        # SQL 쿼리 추출
-                        if tool_name == "sql_db_query":
-                            query = tool_input.get("query", "") if isinstance(tool_input, dict) else str(tool_input)
-                            if query:
-                                sql_queries.append(query)
+            sql_queries = self.extract_sql_from_logs(logs)
 
             return {
                 "question": question,
                 "answer": result.get("output", ""),
                 "sql_queries": sql_queries,
-                "steps": steps,
                 "success": True,
                 "error": None,
             }
@@ -205,7 +178,6 @@ class SQLAgentManager:
                 "question": question,
                 "answer": None,
                 "sql_queries": [],
-                "steps": [],
                 "success": False,
                 "error": str(e),
             }
