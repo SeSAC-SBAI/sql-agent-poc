@@ -43,10 +43,12 @@ class SQLAgentManager:
 
 **질문 분석 절차:**
 1. 먼저 search_table_metadata 도구를 사용하여 적절한 테이블을 찾으세요
-2. search_table_metadata 사용 시 핵심 키워드 1개만 전달하세요
-   - 올바른 예시: search_table_metadata('인구')
-   - 올바른 예시: search_table_metadata('세대')
-   - 잘못된 예시: search_table_metadata('총인구수, 인구수, 서울특별시')
+2. search_table_metadata는 반드시 keywords 파라미터에 단일 키워드를 전달해야 합니다
+   예시:
+   - search_table_metadata(keywords="인구")
+   - search_table_metadata(keywords="세대")
+   - search_table_metadata(keywords="연령")
+   주의: 빈 딕셔너리나 파라미터 없이 호출하면 안됩니다
 3. 검색 결과가 없으면 다른 키워드로 재시도하세요
 4. 메타데이터의 note(주의사항)를 반드시 확인하세요
 
@@ -89,7 +91,7 @@ class SQLAgentManager:
             handle_parsing_errors=True,
             extra_tools=[search_table_metadata],
             prefix=system_prefix + "\n\n" + system_suffix,
-            # suffix=system_suffix,
+            return_intermediate_steps=True,  # 중간 단계 반환 활성화
         )
         print("SQL Agent 생성 완료 (메타데이터 검색 도구 포함)")
 
@@ -106,6 +108,8 @@ class SQLAgentManager:
             dict: {
                 "question": 질문,
                 "answer": 답변,
+                "sql_queries": 실행된 SQL 쿼리 리스트,
+                "steps": 처리 단계,
                 "success": 성공 여부,
                 "error": 에러 메시지 (있을 경우)
             }
@@ -118,11 +122,79 @@ class SQLAgentManager:
             print(f"질문: {question}")
             print(f"{'='*60}")
 
-            result = self.agent.invoke({"input": question})
+            # include_run_info=True로 중간 단계 포함
+            result = self.agent.invoke(
+                {"input": question},
+                config={"callbacks": [], "run_name": "SQL Query"},
+                return_only_outputs=False
+            )
+
+            # 디버그 프린트
+            print(f"\n=== DEBUG ===")
+            print(f"result keys: {result.keys()}")
+            print(f"intermediate_steps 존재: {'intermediate_steps' in result}")
+            
+            if 'intermediate_steps' in result:
+                steps_data = result['intermediate_steps']
+                print(f"intermediate_steps 타입: {type(steps_data)}")
+                print(f"intermediate_steps 개수: {len(steps_data)}")
+                
+                for i, step in enumerate(steps_data):
+                    print(f"\n--- Step {i} ---")
+                    print(f"Step 타입: {type(step)}")
+                    print(f"Step 길이: {len(step) if hasattr(step, '__len__') else 'N/A'}")
+                    
+                    if isinstance(step, tuple) and len(step) >= 1:
+                        action = step[0]
+                        print(f"Action: {action}")
+                        print(f"Action 타입: {type(action)}")
+                        
+                        # 여러 방법으로 tool 정보 추출 시도
+                        tool_name = None
+                        tool_input = None
+                        
+                        if hasattr(action, 'tool'):
+                            tool_name = action.tool
+                        elif hasattr(action, 'tool_name'):
+                            tool_name = action.tool_name
+                            
+                        if hasattr(action, 'tool_input'):
+                            tool_input = action.tool_input
+                            
+                        print(f"Tool name: {tool_name}")
+                        print(f"Tool input: {tool_input}")
+            
+            print(f"=== DEBUG END ===\n")
+
+            # SQL 쿼리 추출
+            sql_queries = []
+            steps = []
+            
+            if "intermediate_steps" in result:
+                for step in result["intermediate_steps"]:
+                    if len(step) >= 2:
+                        action, observation = step[0], step[1]
+                        
+                        # 도구 이름과 입력 저장
+                        tool_name = getattr(action, 'tool', 'unknown')
+                        tool_input = getattr(action, 'tool_input', {})
+                        
+                        steps.append({
+                            "tool": tool_name,
+                            "input": tool_input
+                        })
+                        
+                        # SQL 쿼리 추출
+                        if tool_name == "sql_db_query":
+                            query = tool_input.get("query", "") if isinstance(tool_input, dict) else str(tool_input)
+                            if query:
+                                sql_queries.append(query)
 
             return {
                 "question": question,
                 "answer": result.get("output", ""),
+                "sql_queries": sql_queries,
+                "steps": steps,
                 "success": True,
                 "error": None,
             }
@@ -132,6 +204,8 @@ class SQLAgentManager:
             return {
                 "question": question,
                 "answer": None,
+                "sql_queries": [],
+                "steps": [],
                 "success": False,
                 "error": str(e),
             }
