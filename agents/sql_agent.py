@@ -111,15 +111,21 @@ class SQLAgentManager:
         """
         sql_queries = []
         
-        # SELECT로 시작해서 ;로 끝나는 부분 찾기 (대소문자 무시)
-        pattern = r'(SELECT\s+.+?;)'
-        matches = re.findall(pattern, logs, re.IGNORECASE | re.DOTALL)
-        
-        for match in matches:
-            # 공백 정리
-            sql = ' '.join(match.split())
-            if sql and sql not in sql_queries:
-                sql_queries.append(sql)
+        # Invoking: `sql_db_query` with `{'query': "..." 형식에서 쿼리 추출
+        lines = logs.split('\n')
+        for line in lines:
+            if 'sql_db_query' in line and 'query' in line:
+                # 'query': " 이후부터 찾기
+                start_idx = line.find('"', line.find('query'))
+                if start_idx != -1:
+                    # 다음 "까지 (SQL 쿼리 부분)
+                    end_idx = line.find('"', start_idx + 1)
+                    if end_idx != -1:
+                        sql = line[start_idx + 1:end_idx]
+                        # 이스케이프 처리
+                        sql = sql.replace('\\n', '\n').replace("\\'", "'").strip()
+                        if sql and sql not in sql_queries:
+                            sql_queries.append(sql)
         
         return sql_queries
 
