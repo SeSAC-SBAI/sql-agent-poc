@@ -43,6 +43,26 @@ CLASSIFY_INTENT_PROMPT = """
 """
 
 
+# SQL_GENERATION_PROMPT = """
+# 당신은 자연어 질문을 SQL 쿼리로 변환하는 전문가입니다.
+
+# ## 사용자 질문:
+# {user_query}
+
+# ## 사용 가능한 테이블 정보:
+# {tables_info}
+
+# ## 요구사항:
+# - SQLite 문법을 사용하세요
+# - SELECT 쿼리만 생성하세요
+# - 테이블명과 컬럼명을 정확히 사용하세요
+# - 필요시 WHERE, ORDER BY, LIMIT 등을 활용하세요
+
+# {error_feedback}
+
+# ## 응답 형식:
+# SQL 쿼리만 작성하세요. 설명이나 마크다운 포맷 없이 순수 SQL만 반환하세요.
+# """
 SQL_GENERATION_PROMPT = """
 당신은 자연어 질문을 SQL 쿼리로 변환하는 전문가입니다.
 
@@ -52,11 +72,37 @@ SQL_GENERATION_PROMPT = """
 ## 사용 가능한 테이블 정보:
 {tables_info}
 
+## 변환 예시:
+
+**예시 1: 단순 조회**
+질문: "서울특별시 2016년 1월 총인구수 알려줘"
+SQL: SELECT 값 FROM population_gender_stats WHERE 행정구역 = '서울특별시' AND 년월 = '2016-01' AND 항목 = '총인구수';
+
+**예시 2: 연령대 조회**
+질문: "부산시 2020년 3월 60-64세 남자 인구는?"
+SQL: SELECT 값 FROM population_age_stats WHERE 행정구역 = '부산광역시' AND 년월 = '2020-03' AND 연령대 = '60-64세' AND 항목 = '남자인구수';
+
+**예시 3: 집계**
+질문: "2023년 전체 세대수 합계는?"
+SQL: SELECT SUM(값) FROM population_stats WHERE 년월 LIKE '2023-%';
+
+**예시 4: 기간 조회**
+질문: "서울시 2020년부터 2023년까지 인구 변화"
+SQL: SELECT 년월, 값 FROM population_gender_stats WHERE 행정구역 = '서울특별시' AND 년월 >= '2020-01' AND 년월 <= '2023-12' AND 항목 = '총인구수' ORDER BY 년월;
+
+**예시 5: 최대값**
+질문: "인구가 가장 많은 지역은?"
+SQL: SELECT 행정구역, MAX(값) FROM population_gender_stats WHERE 항목 = '총인구수' GROUP BY 행정구역 ORDER BY MAX(값) DESC LIMIT 1;
+
+## 중요 규칙:
+- 년월 형식: 'YYYY-MM' (예: '2016-01', 반드시 하이픈 포함)
+- 지역명: 정확한 행정구역명 사용 (예: '서울특별시', '부산광역시')
+- 항목: '총인구수', '남자인구수', '여자인구수' 중 선택
+
 ## 요구사항:
 - SQLite 문법을 사용하세요
 - SELECT 쿼리만 생성하세요
-- 테이블명과 컬럼명을 정확히 사용하세요
-- 필요시 WHERE, ORDER BY, LIMIT 등을 활용하세요
+- 위 예시를 참고하여 정확한 형식으로 작성하세요
 
 {error_feedback}
 
