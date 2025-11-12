@@ -1,7 +1,11 @@
+import json
 from typing import Literal
 from langgraph.types import Command
 from langgraph.graph import END
+from langchain_upstage import ChatUpstage
 from agents.state import StatsChatbotState
+from config.settings import settings
+from utils.prompts import CLASSIFY_INTENT_PROMPT
 
 
 def classify_intent(
@@ -18,8 +22,24 @@ def classify_intent(
     - multi_step_analysis: 다단계 분석
     - out_of_scope: 범위 외 질문
     """
-    # TODO: LLM API 호출하여 질문 분류
-    scenario_type = ""  # LLM 결과
+    user_query = state["user_query"]
+
+    # LLM 초기화
+    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+
+    # 프롬프트 포맷팅
+    prompt = CLASSIFY_INTENT_PROMPT.format(user_query=user_query)
+
+    # LLM 호출
+    response = llm.invoke(prompt)
+
+    # JSON 파싱
+    try:
+        result = json.loads(response.content)
+        scenario_type = result["scenario_type"]
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"JSON 파싱 실패: {e}")
+        scenario_type = "out_of_scope"
 
     # 범위 외 질문이면 종료
     if scenario_type == "out_of_scope":
