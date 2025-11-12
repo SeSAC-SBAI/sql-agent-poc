@@ -18,6 +18,9 @@ class Settings:
 
     # Solar API
     UPSTAGE_API_KEY: str = os.getenv("UPSTAGE_API_KEY", "")
+    
+    # Google API
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
 
     # LangSmith
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "false")

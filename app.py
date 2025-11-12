@@ -1,6 +1,6 @@
 import streamlit as st
 from config import settings
-from agents import sql_agent_manager
+from agents.langgraph_agent import langgraph_agent_manager as sql_agent_manager
 
 # 페이지 설정
 st.set_page_config(
