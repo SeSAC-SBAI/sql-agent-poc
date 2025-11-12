@@ -59,6 +59,7 @@ htmlcov/
 *.tmp
 *.bak
 test_*.py
+!tests/node/test_*.py
 temp/
 
 # embedding file
