@@ -1,6 +1,6 @@
 import json
-from typing import Literal
-from langgraph.types import Command
+from typing import Dict, Any, Literal, Optional, List
+from langgraph.types import Command, interrupt
 from langgraph.graph import END
 from langchain_upstage import ChatUpstage
 from agents.state import StatsChatbotState
@@ -61,20 +61,24 @@ def search_tables(
 
     벡터DB에서 질문과 관련된 테이블 검색
     - 질문을 임베딩하여 유사도 검색
-    - 유사도 임계값(0.7) 필터링
+    - 거리 임계값(1.5) 필터링
     - 테이블명 + 스키마 정보 반환
     """
-    # TODO: 질문 임베딩
-    # TODO: 벡터DB 검색
-    # TODO: 유사도 필터링
+    from database.vector_db import search_tables_from_db
 
-    tables_info = []  # 검색 결과
+    # 벡터DB에서 테이블 검색 (거리 1.5 이하만)
+    tables_info = search_tables_from_db(state["user_query"], n_results=1, threshold=1.5)
+
     clarification_count = state.get("clarification_count", 0)
 
     # 테이블 없음 & 재시도 0회 → 추가 정보 요청
     if not tables_info and clarification_count == 0:
         return Command(
-            goto="request_clarification", update={"tables_info": tables_info}
+            goto="request_clarification",
+            update={
+                "tables_info": tables_info,
+                "original_query": state["user_query"],
+            },
         )
 
     # 테이블 없음 & 재시도 1회 이상 → 종료
@@ -98,22 +102,28 @@ def request_clarification(
     3. 추가 정보 요청 노드 (User Input 단계)
 
     테이블 검색 실패 시 사용자에게 추가 정보 요청
-    - LLM이 부족한 정보 파악
-    - 재질문 생성
-    - interrupt()로 사용자 입력 대기
-    """
-    # TODO: LLM으로 부족한 정보 파악
-    # TODO: 재질문 생성
-    # TODO: interrupt()로 사용자 답변 대기
+    - interrupt로 사용자 입력 대기
+    - 원래 질문과 추가 정보 결합
 
+    TODO: 테스트 보류
+    - interrupt 실제 동작 확인 필요
+    - 질문 합치기 검증 필요
+    - clarification_count 증가 확인 필요
+    - 통합 테스트 또는 별도 시나리오 필요
+    """
     clarification_message = "좀 더 구체적으로 알려주시겠어요? (예: 어느 지역? 몇 년도?)"
 
-    # 사용자 답변 받으면 질문 분류부터 재시작
+    # interrupt로 사용자 답변 받기
+    user_additional_info = interrupt(clarification_message)
+
+    # 원래 질문 + 추가 정보
+    combined_query = f"{user_additional_info} {state['original_query']}"
+
     return Command(
         goto="classify_intent",
         update={
             "clarification_count": state["clarification_count"] + 1,
-            # TODO: interrupt로 받은 답변을 user_query에 추가
+            "user_query": combined_query,
         },
     )
 
@@ -125,10 +135,36 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     자연어 질문과 테이블 스키마 정보를 바탕으로 SQL 쿼리 생성
     - 이전 에러가 있으면 에러 메시지도 함께 전달
     """
-    # TODO: LLM API 호출하여 SQL 생성
-    # TODO: sql_error가 있으면 피드백으로 전달
+    from utils.prompts import SQL_GENERATION_PROMPT
 
-    sql_query = ""  # LLM 생성 결과
+    # LLM 초기화
+    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+
+    # 테이블 정보 포맷팅
+    tables_info_str = "\n\n".join(
+        [
+            f"테이블명: {table['table_name']}\n"
+            f"컬럼: {table['columns']}\n"
+            f"설명: {table['description']}"
+            for table in state["tables_info"]
+        ]
+    )
+
+    # 에러 피드백 (재시도 시)
+    error_feedback = ""
+    if state.get("sql_error"):
+        error_feedback = f"\n## 이전 시도 에러:\n{state['sql_error']}\n위 에러를 고려하여 SQL을 수정하세요."
+
+    # 프롬프트 포맷팅
+    prompt = SQL_GENERATION_PROMPT.format(
+        user_query=state["user_query"],
+        tables_info=tables_info_str,
+        error_feedback=error_feedback,
+    )
+
+    # LLM 호출
+    response = llm.invoke(prompt)
+    sql_query = response.content.strip()
 
     return Command(goto="execute_sql", update={"sql_query": sql_query})
 
@@ -143,19 +179,23 @@ def execute_sql(
     - Exception 발생 시 에러 메시지 저장 및 재시도
     - 실행 성공 시 결과 데이터 확인
     """
-    # TODO: SQL 실행
-    # TODO: Exception 처리
-    # TODO: 결과 데이터 확인
+    from database.connection import db_manager
+    import ast
 
     try:
-        query_result = []  # DB 실행 결과
+        # DB 연결 및 SQL 실행
+        db = db_manager.get_db()
+        result_str = db.run(state["sql_query"])
+
+        # 문자열 결과를 리스트로 파싱
+        query_result = ast.literal_eval(result_str) if result_str else []
 
         # 데이터 없음 → 종료
         if not query_result:
             return Command(
                 goto=END,
                 update={
-                    "query_result": query_result,
+                    "query_result": [],
                     "final_response": "조회 결과가 없습니다.",
                 },
             )
@@ -241,7 +281,7 @@ def plan_visualization(
     return Command(goto="generate_response", update={"chart_spec": chart_spec})
 
 
-def generate_response(state: StatsChatbotState) -> Dict[str, Any]:
+def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     """
     9. 응답 생성 노드 (LLM 단계)
 
@@ -254,6 +294,6 @@ def generate_response(state: StatsChatbotState) -> Dict[str, Any]:
     # TODO: LLM으로 최종 응답 생성
     # TODO: 데이터 + 인사이트 + 차트 통합
 
-    return {
-        "final_response": "",
-    }
+    final_response = ""  # LLM 생성 응답
+
+    return Command(goto=END, update={"final_response": final_response})
