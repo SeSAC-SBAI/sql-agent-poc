@@ -28,7 +28,7 @@ class Settings:
     LANGCHAIN_PROJECT: str = os.getenv("LANGCHAIN_PROJECT", "sql-agent-poc")
 
     # Database
-    DB_PATH: str = os.getenv("DB_PATH", "population.db")
+    DB_PATH: str = os.getenv("DB_PATH")
     DB_URI: str = f"sqlite:///{BASE_DIR / DB_PATH}"
 
     # LLM 설정

@@ -1,15 +1,16 @@
 """
-LangGraph 기반 SQL Agent
+LangGraph 기반 SQL Agent (Solar-pro2)
 """
 
 from typing import TypedDict, Annotated, Sequence
 from langgraph.graph import StateGraph, END
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_upstage import ChatUpstage
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from config import settings
 from database import db_manager
 from utils import search_table_metadata
 import operator
+import re
 
 
 # State 정의
@@ -24,8 +25,8 @@ class AgentState(TypedDict):
     error: str
 
 
-class LangGraphSQLAgent:
-    """LangGraph 기반 SQL Agent"""
+class SolarLangGraphAgent:
+    """LangGraph 기반 SQL Agent (Solar-pro2)"""
     
     def __init__(self):
         self.llm = None
@@ -34,47 +35,22 @@ class LangGraphSQLAgent:
         
     def initialize(self):
         """Agent 초기화"""
-        # LLM 초기화 (Gemini)
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro",
-            google_api_key=settings.GOOGLE_API_KEY,
+        # LLM 초기화 (Solar-pro2)
+        self.llm = ChatUpstage(
+            api_key=settings.UPSTAGE_API_KEY,
+            model=settings.MODEL_NAME,
             temperature=settings.TEMPERATURE,
-            convert_system_message_to_human=True
         )
-        print(f"LLM 초기화 완료: gemini-2.5-pro")
+        print(f"LLM 초기화 완료: {settings.MODEL_NAME}")
         
         # DB 연결
         self.db = db_manager.get_db()
         
         # Graph 구성
         self.graph = self._create_graph()
-        print("LangGraph SQL Agent 생성 완료")
+        print("LangGraph SQL Agent (Solar-pro2) 생성 완료")
         
         return self.graph
-    
-    def visualize_graph(self, output_path="graph_visualization.png"):
-        """그래프 시각화 (PNG 파일로 저장)"""
-        try:
-            from langgraph.graph import StateGraph
-            
-            if self.graph is None:
-                self.initialize()
-            
-            # Mermaid PNG로 저장
-            png_data = self.graph.get_graph().draw_mermaid_png()
-            
-            with open(output_path, "wb") as f:
-                f.write(png_data)
-            
-            print(f"✅ 그래프 시각화 저장: {output_path}")
-            return output_path
-            
-        except Exception as e:
-            print(f"❌ 시각화 실패: {e}")
-            print("💡 필요한 패키지 설치: pip install pygraphviz")
-            return None
     
     def _create_graph(self):
         """LangGraph 생성"""
@@ -116,7 +92,6 @@ class LangGraphSQLAgent:
         table_info = search_table_metadata.invoke({"keywords": keyword})
         
         print(f"[메타데이터 검색] 키워드: {keyword}")
-        print(f"[메타데이터 검색] 결과: {table_info[:100]}...")
         
         return {
             **state,
@@ -188,8 +163,7 @@ class LangGraphSQLAgent:
         response = self.llm.invoke([HumanMessage(content=prompt)])
         sql_query = response.content.strip()
         
-        # SQL 정리 및 검증
-        # 1. 코드 블록 제거
+        # SQL 정리
         if "```" in sql_query:
             parts = sql_query.split("```")
             for part in parts:
@@ -198,13 +172,9 @@ class LangGraphSQLAgent:
                     break
             if sql_query.startswith("sql"):
                 sql_query = sql_query[3:]
-            sql_query = sql_query.strip()
         
-        # 2. 태그 제거
-        import re
+        # 태그 및 주석 제거
         sql_query = re.sub(r'<[^>]+>', '', sql_query)
-        
-        # 3. 주석 제거 (-- 이후 내용)
         lines = sql_query.split('\n')
         cleaned_lines = []
         for line in lines:
@@ -214,18 +184,16 @@ class LangGraphSQLAgent:
                 cleaned_lines.append(line.strip())
         sql_query = ' '.join(cleaned_lines)
         
-        # 4. 첫 번째 세미콜론까지만 추출
+        # 첫 번째 세미콜론까지
         if ';' in sql_query:
             sql_query = sql_query.split(';')[0] + ';'
         
-        # 5. WITH 또는 SELECT로 시작하는지 확인
+        # SELECT/WITH 시작 확인
         sql_query = sql_query.strip()
         if not (sql_query.upper().startswith('SELECT') or sql_query.upper().startswith('WITH')):
-            # SELECT 또는 WITH 찾기
             select_idx = sql_query.upper().find('SELECT')
             with_idx = sql_query.upper().find('WITH')
             
-            # 둘 다 있으면 더 앞에 있는 것 사용
             if select_idx != -1 and with_idx != -1:
                 start_idx = min(select_idx, with_idx)
             elif with_idx != -1:
@@ -238,10 +206,9 @@ class LangGraphSQLAgent:
             if start_idx > 0:
                 sql_query = sql_query[start_idx:]
         
-        # 6. 연속 공백을 하나로
         sql_query = ' '.join(sql_query.split())
         
-        print(f"[SQL 생성] {sql_query}")
+        print(f"[SQL 생성] {sql_query[:100]}...")
         
         return {
             **state,
@@ -255,7 +222,7 @@ class LangGraphSQLAgent:
         
         try:
             result = self.db.run(sql_query)
-            print(f"[SQL 실행] 성공: {result[:100]}...")
+            print(f"[SQL 실행] 성공")
             
             return {
                 **state,
@@ -283,13 +250,12 @@ class LangGraphSQLAgent:
         if error:
             return {
                 **state,
-                "answer": f"죄송합니다. 오류가 발생했습니다: {error}"
+                "answer": f"오류 발생: {error}"
             }
         
         # SQL에서 테이블명 추출
-        import re
         tables = re.findall(r'FROM\s+(\w+)', sql_query, re.IGNORECASE)
-        table_info = f"(출처 테이블: {', '.join(set(tables))})" if tables else ""
+        table_info = f"(출처: {', '.join(set(tables))})" if tables else ""
         
         prompt = f"""
         질문: {question}
@@ -298,22 +264,20 @@ class LangGraphSQLAgent:
         **답변 작성 규칙**:
         1. 한국어로 답변
         2. 수치는 쉼표로 구분
-        3. 2-3문장으로 간결하게
-        4. SQL 결과를 그대로 사용 (직접 계산 금지)
-        5. 조회 기준 시점 명시
-        6. 답변 끝에 반드시 데이터 출처 테이블 명시: {table_info}
+        3. 간결하게
+        4. SQL 결과를 그대로 사용
+        5. 데이터 출처: {table_info}
         
-        답변을 작성하세요:
+        답변:
         """
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         answer = response.content.strip()
         
-        # 테이블 정보가 답변에 없으면 추가
         if table_info and table_info not in answer:
             answer = f"{answer} {table_info}"
         
-        print(f"[답변 생성] {answer[:100]}...")
+        print(f"[답변 생성] 완료")
         
         return {
             **state,
@@ -331,7 +295,6 @@ class LangGraphSQLAgent:
             print(f"질문: {question}")
             print(f"{'='*60}")
             
-            # 초기 상태
             initial_state = {
                 "question": question,
                 "messages": [],
@@ -342,7 +305,6 @@ class LangGraphSQLAgent:
                 "error": ""
             }
             
-            # Graph 실행
             result = self.graph.invoke(initial_state)
             
             return {
@@ -365,4 +327,4 @@ class LangGraphSQLAgent:
 
 
 # 전역 인스턴스
-langgraph_agent_manager = LangGraphSQLAgent()
+solar_langgraph_agent = SolarLangGraphAgent()
