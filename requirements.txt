@@ -2,6 +2,7 @@ langchain_community
 langchain_core
 langchain_upstage
 langchain-chroma
+langchain-google-genai
 python-dotenv
 SQLAlchemy
 langgraph

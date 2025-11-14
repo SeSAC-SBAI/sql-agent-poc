@@ -19,6 +19,9 @@ class Settings:
     # Solar API
     UPSTAGE_API_KEY: str = os.getenv("UPSTAGE_API_KEY", "")
 
+    # Google Gemini API
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+
     # LangSmith
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "false")
     LANGCHAIN_API_KEY: str = os.getenv("LANGCHAIN_API_KEY", "")
@@ -29,7 +32,11 @@ class Settings:
     DB_URI: str = f"sqlite:///{BASE_DIR / DB_PATH}"
 
     # LLM 설정
-    MODEL_NAME: str = "solar-pro2"
+    # LLM_PROVIDER: str = "upstage"
+    # MODEL_NAME: str = "solar-pro2"
+    # TEMPERATURE: float = 0.0
+    LLM_PROVIDER: str = "gemini"
+    MODEL_NAME: str = "gemini-2.5-flash"
     TEMPERATURE: float = 0.0
 
     def validate(self):
@@ -44,6 +51,7 @@ class Settings:
         print("✅ 설정 검증 완료")
         print(f"   - DB 경로: {db_full_path}")
         print(f"   - LangSmith 추적: {self.LANGCHAIN_TRACING_V2}")
+        print(f"   - LLM Provider: {self.LLM_PROVIDER}")
         print(f"   - 모델: {self.MODEL_NAME}")
 
 

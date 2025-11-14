@@ -2,8 +2,12 @@ import json
 from typing import Dict, Any, Literal, Optional, List
 from langgraph.types import Command, interrupt
 from langgraph.graph import END
-from langchain_upstage import ChatUpstage
 from agents.state import StatsChatbotState
+from agents.helpers import (
+    extract_calculation_hints,
+    validate_calculation_result,
+    get_llm,
+)
 from config.settings import settings
 from utils.prompts import CLASSIFY_INTENT_PROMPT
 
@@ -25,7 +29,7 @@ def classify_intent(
     user_query = state["user_query"]
 
     # LLM 초기화
-    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+    llm = get_llm()
 
     # 프롬프트 포맷팅
     prompt = CLASSIFY_INTENT_PROMPT.format(user_query=user_query)
@@ -138,7 +142,7 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     from utils.prompts import SQL_GENERATION_PROMPT
 
     # LLM 초기화
-    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+    llm = get_llm()
 
     # 테이블 정보 포맷팅
     tables_info_str = "\n\n".join(
@@ -235,7 +239,6 @@ def process_data(state: StatsChatbotState) -> Command[Literal["analyze_insight"]
     - 나머지: 계산 없이 패스
     """
     from utils.prompts import DATA_PROCESSING_PROMPT
-    from agents.helpers import extract_calculation_hints, validate_calculation_result
 
     scenario_type = state["scenario_type"]
 
@@ -247,7 +250,7 @@ def process_data(state: StatsChatbotState) -> Command[Literal["analyze_insight"]
     hints = extract_calculation_hints(state["user_query"])
 
     # 2. LLM 초기화
-    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+    llm = get_llm()
 
     # 3. 프롬프트 포맷팅
     prompt = DATA_PROCESSING_PROMPT.format(
@@ -290,7 +293,7 @@ def analyze_insight(state: StatsChatbotState) -> Command[Literal["plan_visualiza
     from utils.prompts import INSIGHT_ANALYSIS_PROMPT
 
     # LLM 초기화
-    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+    llm = get_llm()
 
     # 분석할 데이터 결정
     # processed_data가 있으면 사용, 없으면 query_result 사용
@@ -348,7 +351,7 @@ def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     from utils.prompts import RESPONSE_GENERATION_PROMPT
 
     # LLM 초기화
-    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+    llm = get_llm()
 
     # 응답에 포함할 데이터 결정
     if state.get("processed_data"):

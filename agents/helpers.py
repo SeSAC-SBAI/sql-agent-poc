@@ -7,6 +7,28 @@ agents/helpers.py
 import re
 import json
 
+from langchain_google_genai import ChatGoogleGenerativeAI
+from config.settings import settings
+
+# ============================================
+# LLM 초기화
+# ============================================
+
+
+def get_llm():
+    """
+    LLM 인스턴스 반환
+
+    Returns:
+        ChatGoogleGenerativeAI 인스턴스
+    """
+    return ChatGoogleGenerativeAI(
+        model=settings.MODEL_NAME,
+        temperature=settings.TEMPERATURE,
+        google_api_key=settings.GOOGLE_API_KEY,
+        response_mime_type="application/json",
+    )
+
 
 def extract_calculation_hints(user_query: str) -> list:
     """
