@@ -234,17 +234,50 @@ def process_data(state: StatsChatbotState) -> Command[Literal["analyze_insight"]
     - derived_calculation, multi_step_analysis: LLM이 계산 수행
     - 나머지: 계산 없이 패스
     """
+    from utils.prompts import DATA_PROCESSING_PROMPT
+    from agents.helpers import extract_calculation_hints, validate_calculation_result
+
     scenario_type = state["scenario_type"]
 
-    # 계산이 필요한 시나리오
-    if scenario_type in ["derived_calculation", "multi_step_analysis"]:
-        # TODO: LLM으로 계산 수행 (증가율, 비율 등)
-        processed_data = {}  # LLM 계산 결과
-    else:
-        # 계산 불필요
-        processed_data = None
+    # 계산이 필요한 시나리오가 아니면 패스
+    if scenario_type not in ["derived_calculation", "multi_step_analysis"]:
+        return Command(goto="analyze_insight", update={"processed_data": None})
 
-    return Command(goto="analyze_insight", update={"processed_data": processed_data})
+    # 1. 질문에서 계산 힌트 추출
+    hints = extract_calculation_hints(state["user_query"])
+
+    # 2. LLM 초기화
+    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+
+    # 3. 프롬프트 포맷팅
+    prompt = DATA_PROCESSING_PROMPT.format(
+        user_query=state["user_query"],
+        query_result=str(state["query_result"]),
+        hints=", ".join(hints),
+    )
+
+    # 4. LLM 호출
+    try:
+        response = llm.invoke(prompt)
+
+        # 5. JSON 파싱
+        processed_data = json.loads(response.content)
+
+        # 6. 결과 검증
+        if validate_calculation_result(processed_data):
+            return Command(
+                goto="analyze_insight", update={"processed_data": processed_data}
+            )
+
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"데이터 처리 실패: {e}")
+
+    # 7. 실패 시 원본 데이터 반환
+    fallback_data = {
+        "calculated_data": state["query_result"],
+        "description": "원본 데이터",
+    }
+    return Command(goto="analyze_insight", update={"processed_data": fallback_data})
 
 
 def analyze_insight(state: StatsChatbotState) -> Command[Literal["plan_visualization"]]:
@@ -254,9 +287,30 @@ def analyze_insight(state: StatsChatbotState) -> Command[Literal["plan_visualiza
     데이터를 분석하여 경향, 패턴, 특이사항 파악
     - 예: "2020년 이후 감소하다가 2023년부터 회복"
     """
-    # TODO: LLM API 호출하여 인사이트 분석
+    from utils.prompts import INSIGHT_ANALYSIS_PROMPT
 
-    insight = ""  # LLM 분석 결과
+    # LLM 초기화
+    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+
+    # 분석할 데이터 결정
+    # processed_data가 있으면 사용, 없으면 query_result 사용
+    if state.get("processed_data"):
+        data_to_analyze = state["processed_data"]
+    else:
+        data_to_analyze = state["query_result"]
+
+    # 프롬프트 포맷팅
+    prompt = INSIGHT_ANALYSIS_PROMPT.format(
+        user_query=state["user_query"], data=str(data_to_analyze)
+    )
+
+    # LLM 호출
+    try:
+        response = llm.invoke(prompt)
+        insight = response.content.strip()
+    except Exception as e:
+        print(f"인사이트 분석 실패: {e}")
+        insight = ""  # 실패 시 빈 문자열
 
     return Command(goto="plan_visualization", update={"insight": insight})
 
@@ -291,9 +345,42 @@ def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     - 인사이트
     - 시각화 차트 (있으면)
     """
-    # TODO: LLM으로 최종 응답 생성
-    # TODO: 데이터 + 인사이트 + 차트 통합
+    from utils.prompts import RESPONSE_GENERATION_PROMPT
 
-    final_response = ""  # LLM 생성 응답
+    # LLM 초기화
+    llm = ChatUpstage(model=settings.MODEL_NAME, temperature=settings.TEMPERATURE)
+
+    # 응답에 포함할 데이터 결정
+    if state.get("processed_data"):
+        data = state["processed_data"]
+    else:
+        data = state["query_result"]
+
+    # 인사이트
+    insight = state.get("insight", "")
+
+    # 차트 정보
+    chart_info = ""
+    if state.get("chart_spec"):
+        chart_info = f"시각화: {state['chart_spec'].get('chart_type', 'none')}"
+    else:
+        chart_info = "시각화 없음"
+
+    # 프롬프트 포맷팅
+    prompt = RESPONSE_GENERATION_PROMPT.format(
+        user_query=state["user_query"],
+        data=str(data),
+        insight=insight,
+        chart_info=chart_info,
+    )
+
+    # LLM 호출
+    try:
+        response = llm.invoke(prompt)
+        final_response = response.content.strip()
+    except Exception as e:
+        print(f"응답 생성 실패: {e}")
+        # Fallback: 간단한 응답
+        final_response = f"조회 결과:\n{str(data)}\n\n{insight}"
 
     return Command(goto=END, update={"final_response": final_response})
