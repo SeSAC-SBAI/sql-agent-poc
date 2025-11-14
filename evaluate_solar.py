@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import settings
 from database import db_manager
-from agents.sql_LG import solar_langgraph_agent
+from agents.sql_LG_solar_pro2 import solar_langgraph_agent
 
 
 def evaluate_test_cases(input_csv: str, output_csv: str):
