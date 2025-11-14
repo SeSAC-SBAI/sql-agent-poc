@@ -72,44 +72,75 @@ SQL_GENERATION_PROMPT = """
 ## 사용 가능한 테이블 정보:
 {tables_info}
 
+## 테이블 스키마
+population_age_stats:
+- 행정구역: TEXT (예: '서울특별시')
+- 년월: TEXT (예: '2024-01')
+- 연령대: TEXT (예: '0-4', '20-24', '60-64') 주의: 숫자만 사용, "세" 붙이지 않음
+- 항목: TEXT (예: '총인구수', '남자인구수', '여자인구수')
+- 값: INTEGER
+
+population_gender_stats:
+- 행정구역: TEXT (예: '서울특별시')
+- 년월: TEXT (예: '2024-01')
+- 항목: TEXT (예: '총인구수', '남자인구수', '여자인구수')
+- 값: INTEGER
+
+population_stats:
+- 행정구역: TEXT (예: '서울특별시')
+- 년월: TEXT (예: '2024-01')
+- 값: INTEGER
+
 ## 변환 예시:
 
 **예시 1: 단순 조회**
 질문: "서울특별시 2016년 1월 총인구수 알려줘"
 SQL: SELECT 값 FROM population_gender_stats WHERE 행정구역 = '서울특별시' AND 년월 = '2016-01' AND 항목 = '총인구수';
 
-**예시 2: 연령대 조회**
+**예시 2: 연령대 조회 (중요: 숫자만 사용)**
 질문: "부산시 2020년 3월 60-64세 남자 인구는?"
-SQL: SELECT 값 FROM population_age_stats WHERE 행정구역 = '부산광역시' AND 년월 = '2020-03' AND 연령대 = '60-64세' AND 항목 = '남자인구수';
+SQL: SELECT 값 FROM population_age_stats WHERE 행정구역 = '부산광역시' AND 년월 = '2020-03' AND 연령대 = '60-64' AND 항목 = '남자인구수';
 
-**예시 3: 집계**
-질문: "2023년 전체 세대수 합계는?"
-SQL: SELECT SUM(값) FROM population_stats WHERE 년월 LIKE '2023-%';
+**예시 3: 연령대 범위 (IN 사용)**
+질문: "서울 2024년 1월 20대 남자 인구는?"
+SQL: SELECT SUM(값) FROM population_age_stats WHERE 행정구역 = '서울특별시' AND 년월 = '2024-01' AND 연령대 IN ('20-24', '25-29') AND 항목 = '남자인구수';
 
 **예시 4: 기간 조회**
 질문: "서울시 2020년부터 2023년까지 인구 변화"
-SQL: SELECT 년월, 값 FROM population_gender_stats WHERE 행정구역 = '서울특별시' AND 년월 >= '2020-01' AND 년월 <= '2023-12' AND 항목 = '총인구수' ORDER BY 년월;
+SQL: SELECT 년월, 값 FROM population_gender_stats WHERE 행정구역 = '서울특별시' AND 년월 BETWEEN '2020-01' AND '2023-12' AND 항목 = '총인구수' ORDER BY 년월;
 
 **예시 5: 최대값**
 질문: "인구가 가장 많은 지역은?"
-SQL: SELECT 행정구역, MAX(값) FROM population_gender_stats WHERE 항목 = '총인구수' GROUP BY 행정구역 ORDER BY MAX(값) DESC LIMIT 1;
+SQL: SELECT 행정구역, SUM(값) as total FROM population_gender_stats WHERE 항목 = '총인구수' GROUP BY 행정구역 ORDER BY total DESC LIMIT 1;
+
+**예시 6: 복합 집계 (월평균 차이)**
+질문: "서울 2024년 1~6월 20대와 60대 이상 남자 차이의 월평균은?"
+SQL: 
+SELECT 
+  (SELECT SUM(값) FROM population_age_stats 
+   WHERE 행정구역='서울특별시' AND 년월 BETWEEN '2024-01' AND '2024-06' 
+   AND 연령대 IN ('20-24','25-29','30-34','35-39') AND 항목='남자인구수') / 6.0
+  -
+  (SELECT SUM(값) FROM population_age_stats 
+   WHERE 행정구역='서울특별시' AND 년월 BETWEEN '2024-01' AND '2024-06' 
+   AND 연령대 IN ('60-64','65-69','70-74','75-79','80-84','85-89','90-94') AND 항목='남자인구수') / 6.0;
 
 ## 중요 규칙:
-- 년월 형식: 'YYYY-MM' (예: '2016-01', 반드시 하이픈 포함)
-- 지역명: 정확한 행정구역명 사용 (예: '서울특별시', '부산광역시')
-- 항목: '총인구수', '남자인구수', '여자인구수' 중 선택
-
-## 요구사항:
-- SQLite 문법을 사용하세요
-- SELECT 쿼리만 생성하세요
-- 위 예시를 참고하여 정확한 형식으로 작성하세요
+1. 연령대는 숫자만 사용 (예: '20-24', NOT '20-24세')
+2. "20대"는 IN ('20-24', '25-29')로 변환
+3. "60대 이상"은 IN ('60-64','65-69','70-74','75-79','80-84','85-89','90-94','95-99')
+4. 동적 계산(INSTR, SUBSTR, CAST) 사용하지 말고 명시적으로 나열
+5. JOIN보다는 서브쿼리 선호
 
 {error_feedback}
 
 ## 응답 형식:
-SQL 쿼리만 작성하세요. 설명이나 마크다운 포맷 없이 순수 SQL만 반환하세요.
-"""
+SQL 쿼리만 작성하세요. 설명이나 마크다운 없이 순수 SQL만 반환하세요.
+큰따옴표나 작은따옴표로 SQL 전체를 감싸지 마세요.
 
+잘못된 예: "SELECT * FROM table"
+올바른 예: SELECT * FROM table
+"""
 
 DATA_PROCESSING_PROMPT = """
 당신은 데이터 분석 전문가입니다.

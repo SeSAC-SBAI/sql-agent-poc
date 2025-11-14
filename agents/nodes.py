@@ -170,6 +170,17 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     response = llm.invoke(prompt)
     sql_query = response.content.strip()
 
+    # SQL 쿼리 후처리
+    # 1. 큰따옴표 제거
+    sql_query = sql_query.strip('"').strip("'")
+
+    # 2. 마크다운 코드 블록 제거
+    if sql_query.startswith("```"):
+        sql_query = sql_query.split("```")[1]
+        if sql_query.startswith("sql"):
+            sql_query = sql_query[3:]
+        sql_query = sql_query.strip()
+
     return Command(goto="execute_sql", update={"sql_query": sql_query})
 
 
@@ -186,16 +197,45 @@ def execute_sql(
     from database.connection import db_manager
     import ast
 
+    # print("=" * 60)
+    # print("DEBUG - execute_sql 시작")
+    # print(f"DEBUG - SQL: {state['sql_query']}")
+    # print("=" * 60)
+
     try:
         # DB 연결 및 SQL 실행
         db = db_manager.get_db()
         result_str = db.run(state["sql_query"])
 
+        # print(f"DEBUG - result_str: {repr(result_str)}")
+        # print(f"DEBUG - result_str type: {type(result_str)}")
+        # print(f"DEBUG - result_str bool: {bool(result_str)}")
+
         # 문자열 결과를 리스트로 파싱
         query_result = ast.literal_eval(result_str) if result_str else []
 
-        # 데이터 없음 → 종료
+        # print(f"DEBUG - query_result: {query_result}")
+        # print(f"DEBUG - query_result type: {type(query_result)}")
+        # print(f"DEBUG - query_result bool: {bool(query_result)}")
+        # print(f"DEBUG - len: {len(query_result)}")
+        # print("=" * 60)
+
+        # 데이터 없음 → 재시도 체크
         if not query_result:
+            sql_retry_count = state.get("sql_retry_count", 0)
+
+            # 재시도 2회 미만 → SQL 재생성
+            if sql_retry_count < 2:
+                return Command(
+                    goto="generate_sql",
+                    update={
+                        "query_result": [],
+                        "sql_error": "조회 결과가 없습니다. 쿼리를 수정해주세요.",
+                        "sql_retry_count": sql_retry_count + 1,
+                    },
+                )
+
+            # 재시도 2회 이상 → 종료
             return Command(
                 goto=END,
                 update={
@@ -211,16 +251,20 @@ def execute_sql(
         )
 
     except Exception as e:
+        print(f"DEBUG - Exception 발생: {e}")
+        print(f"DEBUG - Exception type: {type(e)}")
+        print("=" * 60)
+
         sql_retry_count = state.get("sql_retry_count", 0)
 
-        # 재시도 3회 미만 → SQL 재생성
-        if sql_retry_count < 3:
+        # 재시도 2회 미만 → SQL 재생성
+        if sql_retry_count < 2:
             return Command(
                 goto="generate_sql",
                 update={"sql_error": str(e), "sql_retry_count": sql_retry_count + 1},
             )
 
-        # 재시도 3회 이상 → 종료
+        # 재시도 2회 이상 → 종료
         return Command(
             goto=END,
             update={
