@@ -38,12 +38,12 @@ class LangGraphSQLAgent:
         from langchain_google_genai import ChatGoogleGenerativeAI
         
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro",
+            model="gemini-2.5-flash",
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=settings.TEMPERATURE,
             convert_system_message_to_human=True
         )
-        print(f"LLM 초기화 완료: gemini-2.5-pro")
+        print(f"LLM 초기화 완료: gemini-2.5-flash")
         
         # DB 연결
         self.db = db_manager.get_db()

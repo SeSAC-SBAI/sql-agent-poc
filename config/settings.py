@@ -30,6 +30,9 @@ class Settings:
     # Database
     DB_PATH: str = os.getenv("DB_PATH")
     DB_URI: str = f"sqlite:///{BASE_DIR / DB_PATH}"
+    
+    TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "")
+    TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
 
     # LLM 설정
     MODEL_NAME: str = "solar-pro2"

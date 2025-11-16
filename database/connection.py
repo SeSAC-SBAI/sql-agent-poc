@@ -1,5 +1,5 @@
 """
-데이터베이스 연결 관리 모듈
+데이터베이스 연결 관리 모듈 (Turso 지원)
 """
 
 from langchain_community.utilities import SQLDatabase
@@ -11,7 +11,14 @@ class DatabaseManager:
     """데이터베이스 연결 및 관리"""
 
     def __init__(self):
-        self.db_uri = settings.DB_URI
+        # Turso DB 사용 여부 확인
+        if hasattr(settings, 'TURSO_DATABASE_URL') and settings.TURSO_DATABASE_URL:
+            # libsql 드라이버 사용
+            self.db_uri = f"{settings.TURSO_DATABASE_URL}?authToken={settings.TURSO_AUTH_TOKEN}"
+        else:
+            # 로컬 SQLite
+            self.db_uri = settings.DB_URI
+        
         self.db = None
         self.engine = None
 
@@ -19,12 +26,20 @@ class DatabaseManager:
         """데이터베이스 연결"""
         try:
             # SQLAlchemy 엔진 생성
-            self.engine = create_engine(self.db_uri)
+            connect_args = {}
+            if "https://" not in self.db_uri:
+                connect_args["check_same_thread"] = False
+            
+            self.engine = create_engine(
+                self.db_uri,
+                connect_args=connect_args
+            )
 
             # LangChain SQLDatabase 래퍼 생성
             self.db = SQLDatabase(self.engine)
 
-            print(f"✅ DB 연결 성공: {settings.DB_PATH}")
+            db_name = "Turso DB" if "turso.io" in self.db_uri else settings.DB_PATH
+            print(f"✅ DB 연결 성공: {db_name}")
             return self.db
 
         except Exception as e:
@@ -47,9 +62,11 @@ class DatabaseManager:
             tables = self.db.get_usable_table_names()
             print(f"📊 사용 가능한 테이블: {tables}")
 
-            # 샘플 쿼리 실행
-            result = self.db.run("SELECT COUNT(*) FROM population_gender_stats;")
-            print(f"📈 population_gender_stats 행 수: {result}")
+            # 샘플 쿼리 실행 (테이블이 있을 경우)
+            if tables:
+                first_table = tables[0]
+                result = self.db.run(f"SELECT COUNT(*) FROM {first_table};")
+                print(f"📈 {first_table} 행 수: {result}")
 
             return True
 
