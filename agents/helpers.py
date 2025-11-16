@@ -27,6 +27,17 @@ def get_llm():
         temperature=settings.TEMPERATURE,
         google_api_key=settings.GOOGLE_API_KEY,
         response_mime_type="application/json",
+        max_output_tokens=2048,
+    )
+
+
+def get_llm_text():
+    """텍스트 출력 전용 (JSON 모드 없음)"""
+    return ChatGoogleGenerativeAI(
+        model=settings.MODEL_NAME,
+        temperature=settings.TEMPERATURE,
+        google_api_key=settings.GOOGLE_API_KEY,
+        max_output_tokens=2048,
     )
 
 

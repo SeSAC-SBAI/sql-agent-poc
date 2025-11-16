@@ -1,6 +1,5 @@
 """Agents 패키지"""
 
-from .sql_agent import sql_agent_manager
 from .state import StatsChatbotState
 from .nodes import (
     classify_intent,

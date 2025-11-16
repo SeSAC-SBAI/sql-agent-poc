@@ -7,6 +7,7 @@ from agents.helpers import (
     extract_calculation_hints,
     validate_calculation_result,
     get_llm,
+    get_llm_text,
 )
 from config.settings import settings
 from utils.prompts import CLASSIFY_INTENT_PROMPT
@@ -63,15 +64,20 @@ def search_tables(
     """
     2. 테이블 및 스키마 검색 노드 (Data 단계)
 
-    벡터DB에서 질문과 관련된 테이블 검색
-    - 질문을 임베딩하여 유사도 검색
-    - 거리 임계값(1.5) 필터링
-    - 테이블명 + 스키마 정보 반환
+    스마트 테이블 검색 (벡터 + Rule 조합)
+    - 벡터 검색: 질문을 임베딩하여 유사도 검색
+    - Rule 검색: 비율 계산 등 필수 테이블 자동 추가
+    - 상세 메타데이터 반환
     """
-    from database.vector_db import search_tables_from_db
+    from database.vector_db import smart_search_tables
 
     # 벡터DB에서 테이블 검색 (거리 1.5 이하만)
-    tables_info = search_tables_from_db(state["user_query"], n_results=1, threshold=1.5)
+    # tables_info = search_tables_from_db(state["user_query"], n_results=1, threshold=1.5)
+
+    # Rule 기반 검색 (벡터 + Rule 조합)
+    tables_info = smart_search_tables(
+        state["user_query"], n_results=5  # 여러 테이블 가능
+    )
 
     clarification_count = state.get("clarification_count", 0)
 
@@ -142,7 +148,7 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     from utils.prompts import SQL_GENERATION_PROMPT
 
     # LLM 초기화
-    llm = get_llm()
+    llm = get_llm_text()
 
     # 테이블 정보 포맷팅
     tables_info_str = "\n\n".join(
@@ -180,6 +186,10 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
         if sql_query.startswith("sql"):
             sql_query = sql_query[3:]
         sql_query = sql_query.strip()
+
+    # 세미콜론 자동 추가
+    if not sql_query.endswith(";"):
+        sql_query += ";"
 
     return Command(goto="execute_sql", update={"sql_query": sql_query})
 
@@ -251,9 +261,9 @@ def execute_sql(
         )
 
     except Exception as e:
-        print(f"DEBUG - Exception 발생: {e}")
-        print(f"DEBUG - Exception type: {type(e)}")
-        print("=" * 60)
+        # print(f"DEBUG - Exception 발생: {e}")
+        # print(f"DEBUG - Exception type: {type(e)}")
+        # print("=" * 60)
 
         sql_retry_count = state.get("sql_retry_count", 0)
 
@@ -395,7 +405,7 @@ def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     from utils.prompts import RESPONSE_GENERATION_PROMPT
 
     # LLM 초기화
-    llm = get_llm()
+    llm = get_llm_text()
 
     # 응답에 포함할 데이터 결정
     if state.get("processed_data"):
