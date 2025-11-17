@@ -498,6 +498,7 @@ def format_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     prompt = prompt_tmpl.format(
         user_query=user_query,
         base_answer=base_answer,
+        user_request=style_request,
     )
 
     try:
