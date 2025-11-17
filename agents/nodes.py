@@ -467,6 +467,8 @@ def format_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
     style = (state.get("output_style") or "default").lower()
     base_answer = state.get("final_response", "")
     user_query = state.get("user_query", "")
+    style_request = state.get("style_request") or ""  # 🔹 추가: 사용자 방향성
+
 
     # 2) 스타일이 지정되지 않았으면 그냥 원본 그대로 종료
     if style in ("default", "", None):
@@ -518,6 +520,8 @@ def format_answer_by_style(
     base_answer: str,
     user_query: str,
     style: str,
+    style_request: Optional[str] = None,  # 🔹 추가 (기본값 있어서 기존 호출 그대로 동작)
+
 ) -> str:
     """
     최종 답변을 기자/논문/블로그 스타일로 변환하는 헬퍼 함수.
@@ -542,6 +546,7 @@ def format_answer_by_style(
     prompt = prompt_tmpl.format(
         user_query=user_query,
         base_answer=base_answer,
+        user_request=style_request or "",  # 🔹 추가: 없으면 빈 문자열
     )
 
     try:

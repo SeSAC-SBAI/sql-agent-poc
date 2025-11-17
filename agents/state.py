@@ -32,9 +32,10 @@ class StatsChatbotState(TypedDict):
     # 응답
     final_response: str  # 최종 응답 메시지
     
-    # 신규 필드
-    output_style: Optional[str]        # "paper" / "report" / "blog" 등
-    styled_response: Optional[str]     # 스타일 적용 후 최종 답변
+    # 스타일 재생성용 추가 정보
+    output_style: Optional[str]          # "report" / "paper" / "blog" 등 (없으면 None)
+    style_request: Optional[str]         # 사용자가 추가로 적은 글 방향/요구사항
+    styled_response: Optional[str]       # 스타일 적용 후 최종 응답 (없으면 None)
     
 
     # 재시도 및 에러

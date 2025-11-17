@@ -112,11 +112,18 @@ def main():
                 style_choice = input("스타일 선택 (report/paper/blog, 그냥 엔터면 건너뜀): ").strip().lower()
 
                 if style_choice in ("report", "paper", "blog"):
+                    # 🔹 추가: 사용자가 원하는 방향성을 한 줄 입력 받기
+                    style_request = input(
+                        "어떤 방향/느낌으로 글을 쓸까요? "
+                        "(예: '서울시 관련 칼럼 기사를 쓸거야', '강원도 관련 데이터 통계분석을 통해 연구 논문으로 ', '블로그 후기 느낌으로' 등, 그냥 엔터면 기본 스타일): "
+                    ).strip()
+
                     print("\n🎨 스타일 변환 중...\n")
                     styled_answer = format_answer_by_style(
                         base_answer=base_answer,
                         user_query=user_query,
                         style=style_choice,
+                        style_request=style_request or None,  # 🔹 이제 변수 정의됨
                     )
 
                     print_separator()
