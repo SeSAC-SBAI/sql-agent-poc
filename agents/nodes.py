@@ -153,9 +153,11 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     # 테이블 정보 포맷팅
     tables_info_str = "\n\n".join(
         [
-            f"테이블명: {table['table_name']}\n"
+            f"### {table['table_name']}\n"
+            f"설명: {table['description']}\n"
             f"컬럼: {table['columns']}\n"
-            f"설명: {table['description']}"
+            f"시간컬럼: {table.get('period_column', '년월')}\n"
+            f"주의사항: {table.get('caution', '없음')}"
             for table in state["tables_info"]
         ]
     )

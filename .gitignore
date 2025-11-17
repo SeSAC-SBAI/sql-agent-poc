@@ -74,3 +74,6 @@ embedding_db/
 **/*.json
 
 langgraph_agent.py
+
+# previous prompts
+previous prompts/

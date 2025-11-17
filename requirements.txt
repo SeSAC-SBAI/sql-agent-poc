@@ -9,3 +9,4 @@ langgraph
 chromadb
 streamlit
 pytest
+sqlalchemy-libsql

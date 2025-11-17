@@ -18,13 +18,19 @@ class DatabaseManager:
     def connect(self):
         """데이터베이스 연결"""
         try:
-            # SQLAlchemy 엔진 생성
-            self.engine = create_engine(self.db_uri)
+            # Turso용 SQLAlchemy 엔진 생성
+            self.engine = create_engine(
+                self.db_uri,
+                connect_args={
+                    "check_same_thread": False,  # 멀티스레드 지원
+                    "auth_token": settings.TURSO_AUTH_TOKEN,
+                },
+            )
 
             # LangChain SQLDatabase 래퍼 생성
             self.db = SQLDatabase(self.engine)
 
-            print(f"✅ DB 연결 성공: {settings.DB_PATH}")
+            print(f"✅ Turso DB 연결 성공: {settings.TURSO_DATABASE_URL}")
             return self.db
 
         except Exception as e:

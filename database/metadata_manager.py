@@ -12,41 +12,44 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
+PERIOD_COLUMN_MAP = {
+    "month": "년월",
+    "year": "년도",
+}
+
 
 class MetadataManager:
     """테이블 메타데이터 관리 클래스"""
 
-    def __init__(self, db_path: Optional[str] = None):
-        """
-        초기화 및 전체 메타데이터 캐싱
+    def __init__(self):
+        """초기화 및 전체 메타데이터 캐싱"""
+        from database.connection import db_manager
 
-        Args:
-            db_path: DB 파일 경로 (None이면 settings에서 가져옴)
-        """
-        if db_path is None:
-            from config.settings import settings, BASE_DIR
-
-            db_path = BASE_DIR / settings.DB_PATH
-
-        self.db_path = Path(db_path)
         self._cache: Dict[str, Dict] = {}
 
-        # 전체 메타데이터 로드
-        self._load_all_to_cache()
+        # Turso DB 연결 사용
+        db = db_manager.get_db()
+        conn = db._engine.raw_connection()
 
-    def _load_all_to_cache(self):
+        # 전체 메타데이터 로드
+        self._load_all_to_cache(conn)
+
+    def _load_all_to_cache(self, conn):
         """DB에서 전체 메타데이터를 메모리에 캐싱"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row  # 딕셔너리처럼 접근 가능
         cursor = conn.cursor()
 
         try:
             cursor.execute("SELECT * FROM tables_metadata")
             rows = cursor.fetchall()
 
+            # 컬럼명 가져오기
+            column_names = [desc[0] for desc in cursor.description]
+
             for row in rows:
-                table_name = row["table_name"]
-                self._cache[table_name] = dict(row)
+                # 튜플을 딕셔너리로 변환
+                row_dict = dict(zip(column_names, row))
+                table_name = row_dict["table_name"]
+                self._cache[table_name] = row_dict
 
             print(
                 f"✅ MetadataManager: {len(self._cache)}개 테이블 메타데이터 로드 완료"
@@ -55,8 +58,6 @@ class MetadataManager:
         except Exception as e:
             print(f"❌ 메타데이터 로드 실패: {e}")
             raise
-        finally:
-            conn.close()
 
     def get_short_doc(self, table_name: str) -> Optional[str]:
         """
@@ -101,6 +102,7 @@ class MetadataManager:
         # JSON 문자열 파싱
         columns_list = json.loads(meta["columns_schema_outline"])
         column_detail = json.loads(meta["column_schema_detail"])
+        time_freq = meta.get("time_freq", "month")
 
         return {
             "table_name": table_name,
@@ -115,6 +117,7 @@ class MetadataManager:
             "period": f"{meta['period_start']} ~ {meta['period_end']}",
             "geo_level": meta.get("geo_level", ""),
             "time_freq": meta.get("time_freq", ""),
+            "period_column": PERIOD_COLUMN_MAP.get(time_freq, "년월"),
         }
 
     def get_table_names(self) -> List[str]:
@@ -146,12 +149,9 @@ class MetadataManager:
 _metadata_manager = None
 
 
-def get_metadata_manager(db_path: Optional[str] = None) -> MetadataManager:
+def get_metadata_manager() -> MetadataManager:
     """
     MetadataManager 싱글톤 인스턴스 반환
-
-    Args:
-        db_path: DB 파일 경로 (최초 호출 시에만 사용)
 
     Returns:
         MetadataManager 인스턴스
@@ -159,22 +159,13 @@ def get_metadata_manager(db_path: Optional[str] = None) -> MetadataManager:
     global _metadata_manager
 
     if _metadata_manager is None:
-        _metadata_manager = MetadataManager(db_path)
+        _metadata_manager = MetadataManager()
 
     return _metadata_manager
 
 
 # 테스트 코드
 if __name__ == "__main__":
-    import sys
-    from pathlib import Path
-
-    # 프로젝트 루트 경로 추가 (이 부분 수정!)
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root))
-
-    from config.settings import settings
-
     # 초기화
     manager = get_metadata_manager()
 
@@ -195,12 +186,6 @@ if __name__ == "__main__":
     print(f"- 컬럼: {detail['columns']}")
     print(f"- 기간: {detail['period']}")
     print(f"- 필드 개수: {len(detail)}")
-
-    # 테스트 추가
-    print("\n🔍 전체 카테고리 확인:")
-    for table_name in manager.get_table_names():
-        meta = manager._cache[table_name]
-        print(f"  - {table_name}: {meta['topic_main']}")
 
     # 카테고리 필터링 테스트
     print("\n🏷️ 카테고리 필터링 (인구):")

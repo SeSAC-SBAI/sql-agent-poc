@@ -27,29 +27,40 @@ class Settings:
     LANGCHAIN_API_KEY: str = os.getenv("LANGCHAIN_API_KEY", "")
     LANGCHAIN_PROJECT: str = os.getenv("LANGCHAIN_PROJECT", "sql-agent-poc")
 
+    # Turso Database
+    TURSO_DATABASE_URL: str = os.getenv("TURSO_DATABASE_URL", "")
+    TURSO_AUTH_TOKEN: str = os.getenv("TURSO_AUTH_TOKEN", "")
+
     # Database
-    DB_PATH: str = os.getenv("DB_PATH", "population.db")
-    DB_URI: str = f"sqlite:///{BASE_DIR / DB_PATH}"
+    # DB_PATH: str = os.getenv("DB_PATH", "population.db")
+    # DB_URI: str = f"sqlite:///{BASE_DIR / DB_PATH}"
 
     # LLM 설정
-    # LLM_PROVIDER: str = "upstage"
-    # MODEL_NAME: str = "solar-pro2"
-    # TEMPERATURE: float = 0.0
     LLM_PROVIDER: str = "gemini"
     MODEL_NAME: str = "gemini-2.5-flash"
     TEMPERATURE: float = 0.0
+
+    @property
+    def DB_URI(self):
+        """DB URI 동적 생성"""
+        return f"sqlite+{self.TURSO_DATABASE_URL}?secure=true"
 
     def validate(self):
         """필수 설정 값 검증"""
         if not self.UPSTAGE_API_KEY:
             raise ValueError("UPSTAGE_API_KEY가 설정되지 않았습니다.")
 
-        db_full_path = BASE_DIR / self.DB_PATH
-        if not db_full_path.exists():
-            raise FileNotFoundError(f"DB 파일을 찾을 수 없습니다: {db_full_path}")
+        if not self.GOOGLE_API_KEY:
+            raise ValueError("GOOGLE_API_KEY가 설정되지 않았습니다.")
+
+        if not self.TURSO_DATABASE_URL:
+            raise ValueError("TURSO_DATABASE_URL이 설정되지 않았습니다.")
+        if not self.TURSO_AUTH_TOKEN:
+            raise ValueError("TURSO_AUTH_TOKEN이 설정되지 않았습니다.")
 
         print("✅ 설정 검증 완료")
-        print(f"   - DB 경로: {db_full_path}")
+        print(f"   - DB URL: {self.TURSO_DATABASE_URL}")
+        print(f"   - DB URI: {self.DB_URI}")
         print(f"   - LangSmith 추적: {self.LANGCHAIN_TRACING_V2}")
         print(f"   - LLM Provider: {self.LLM_PROVIDER}")
         print(f"   - 모델: {self.MODEL_NAME}")
