@@ -42,20 +42,30 @@ def classify_intent(
     try:
         result = json.loads(response.content)
         scenario_type = result["scenario_type"]
+        reasoning = result.get("reasoning", "분류 완료")
     except (json.JSONDecodeError, KeyError) as e:
         print(f"JSON 파싱 실패: {e}")
+        print(f"원본 응답: {response.content}")
         scenario_type = "out_of_scope"
+        reasoning = "파싱 실패"
 
     # 범위 외 질문이면 종료
     if scenario_type == "out_of_scope":
         final_response = "죄송합니다. 저는 통계 데이터 조회 전문 챗봇입니다. 인구, 경제, 사회 등의 통계 데이터 관련 질문을 해주세요."
         return Command(
             goto=END,
-            update={"scenario_type": scenario_type, "final_response": final_response},
+            update={
+                "scenario_type": scenario_type,
+                "final_response": final_response,
+                "reasoning": reasoning,
+            },
         )
 
     # 범위 내 질문이면 테이블 검색으로
-    return Command(goto="search_tables", update={"scenario_type": scenario_type})
+    return Command(
+        goto="search_tables",
+        update={"scenario_type": scenario_type, "reasoning": reasoning},
+    )
 
 
 def search_tables(
@@ -174,9 +184,28 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
         error_feedback=error_feedback,
     )
 
+    # ===== 디버깅 =====
+    print(f"\n[DEBUG] SQL 생성 시도 {state.get('sql_retry_count', 0) + 1}회")
+    print(f"[DEBUG] 사용 테이블: {[t['table_name'] for t in state['tables_info']]}")
+    # ===== 추가 =====
+
     # LLM 호출
     response = llm.invoke(prompt)
+
+    # ===== 더 자세한 디버깅 =====
+    print(f"[DEBUG] LLM 응답 타입: {type(response)}")
+    print(f"[DEBUG] LLM 응답 전체: {response}")
+    print(f"[DEBUG] content 길이: {len(response.content) if response.content else 0}")
+
+    if hasattr(response, "response_metadata"):
+        print(f"[DEBUG] metadata: {response.response_metadata}")
+    # ===== 추가 끝 =====
+
     sql_query = response.content.strip()
+
+    # ===== 디버깅 =====
+    print(f"[DEBUG] 생성된 SQL (raw): {repr(sql_query[:100])}")
+    # ===== 추가 =====
 
     # SQL 쿼리 후처리
     # 1. 큰따옴표 제거
@@ -192,6 +221,10 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     # 세미콜론 자동 추가
     if not sql_query.endswith(";"):
         sql_query += ";"
+
+    # ===== 디버깅 =====
+    print(f"[DEBUG] 최종 SQL: {sql_query}")
+    # ===== 추가 =====
 
     return Command(goto="execute_sql", update={"sql_query": sql_query})
 
