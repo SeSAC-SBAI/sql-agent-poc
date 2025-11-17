@@ -10,6 +10,7 @@ class StatsChatbotState(TypedDict):
         str
     ]  # 원래 질문 저장용 (추가 질문 받았을 때 원본이 이곳에 저장)
     scenario_type: str  # 시나리오 타입: "single_value", "table_view", "simple_aggregation", "derived_calculation", "multi_step_analysis", "out_of_scope"
+    reasoning: Optional[str]
 
     # 테이블 검색
     tables_info: List[
