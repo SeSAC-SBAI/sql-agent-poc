@@ -13,6 +13,48 @@ from langchain_upstage import UpstageEmbeddings
 from langchain_chroma import Chroma
 from config.settings import settings
 
+_query_embeddings = None
+_vectorstore = None
+
+
+def get_passage_embeddings():
+    """
+    문서 임베딩용 (벡터 DB 구축 시 사용)
+
+    Returns:
+        UpstageEmbeddings: passage 임베딩 모델
+    """
+    return UpstageEmbeddings(
+        api_key=settings.UPSTAGE_API_KEY, model="embedding-passage"
+    )
+
+
+def get_query_embeddings():
+    """질문 임베딩용 (검색 시 사용) - 캐싱"""
+    global _query_embeddings
+
+    if _query_embeddings is None:
+        _query_embeddings = UpstageEmbeddings(
+            api_key=settings.UPSTAGE_API_KEY, model="embedding-query"
+        )
+        print("📌 Query 임베딩 모델 로드 완료")
+
+    return _query_embeddings
+
+
+def get_vectorstore():
+    """벡터스토어 로드 (캐싱)"""
+    global _vectorstore
+
+    if _vectorstore is None:
+        embeddings = get_query_embeddings()
+        _vectorstore = Chroma(
+            persist_directory="./embedding_db", embedding_function=embeddings
+        )
+        print("📌 벡터스토어 로드 완료")
+
+    return _vectorstore
+
 
 def setup_embedding_db(db_path: str = None):
     """
@@ -53,9 +95,7 @@ def setup_embedding_db(db_path: str = None):
         )
 
     # Upstage 임베딩
-    embeddings = UpstageEmbeddings(
-        api_key=settings.UPSTAGE_API_KEY, model="solar-embedding-1-large"
-    )
+    embeddings = get_passage_embeddings()
 
     # Chroma 벡터스토어 생성
     vectorstore = Chroma.from_texts(
@@ -66,6 +106,7 @@ def setup_embedding_db(db_path: str = None):
     )
 
     print(f"✅ 벡터 DB 생성: {len(documents)}개 테이블")
+    print(f"📄 임베딩 모델: embedding-passage")
     return vectorstore
 
 
@@ -182,14 +223,7 @@ def search_tables_hierarchical(
 
     manager = get_metadata_manager()
 
-    # 임베딩 & 벡터스토어 로드
-    embeddings = UpstageEmbeddings(
-        api_key=settings.UPSTAGE_API_KEY, model="solar-embedding-1-large"
-    )
-
-    vectorstore = Chroma(
-        persist_directory="./embedding_db", embedding_function=embeddings
-    )
+    vectorstore = get_vectorstore()
 
     # 벡터 검색
     search_kwargs = {"k": n_results * 2}  # 여유있게
@@ -202,11 +236,14 @@ def search_tables_hierarchical(
 
     # 임계값 필터링 (거리 2.0 이하만)
     filtered_tables = []
+    distance_map = {}
+
     for doc, distance in results:
         if distance <= 2.0:
             table_name = doc.metadata.get("table_name")
             if table_name:
                 filtered_tables.append(table_name)
+                distance_map[table_name] = distance
 
     # 상위 n개만
     top_tables = filtered_tables[:n_results]
@@ -216,6 +253,7 @@ def search_tables_hierarchical(
     for table_name in top_tables:
         detailed = manager.get_detailed_info(table_name)
         if detailed:
+            detailed["distance"] = round(distance_map[table_name], 3)
             detailed_tables.append(detailed)
 
     return detailed_tables
@@ -248,7 +286,8 @@ def smart_search_tables(query: str, n_results: int = 5) -> List[Dict]:
 
     print(f"벡터 검색: {len(vector_results)}개")
     for table in vector_results:
-        print(f"  - {table['table_name']}")
+        distance = table.get("distance", "N/A")
+        print(f"  - {table['table_name']} (거리: {distance})")
 
     # 3. Rule 기반 필수 테이블
     required_tables = get_required_tables_by_rule(query)
@@ -268,7 +307,7 @@ def smart_search_tables(query: str, n_results: int = 5) -> List[Dict]:
     return final_results
 
 
-# 기존 함수 (하위 호환성 유지)
+# 기존 함수 (하위 호환)
 def search_tables_from_db(
     query: str, n_results: int = 1, threshold: float = 1.5
 ) -> list:
@@ -283,9 +322,7 @@ def search_tables_from_db(
     Returns:
         list: 관련 테이블 정보 리스트
     """
-    embeddings = UpstageEmbeddings(
-        api_key=settings.UPSTAGE_API_KEY, model="solar-embedding-1-large"
-    )
+    embeddings = get_query_embeddings()
 
     vectorstore = Chroma(
         persist_directory="./embedding_db", embedding_function=embeddings
