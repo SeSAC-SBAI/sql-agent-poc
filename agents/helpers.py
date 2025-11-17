@@ -27,7 +27,7 @@ def get_llm():
         temperature=settings.TEMPERATURE,
         google_api_key=settings.GOOGLE_API_KEY,
         response_mime_type="application/json",
-        max_output_tokens=2048,
+        max_output_tokens=4096,
     )
 
 

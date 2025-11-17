@@ -14,7 +14,6 @@ from .nodes import (
 )
 
 __all__ = [
-    "sql_agent_manager",
     "StatsChatbotState",
     "classify_intent",
     "search_tables",
