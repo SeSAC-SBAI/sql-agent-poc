@@ -51,10 +51,6 @@ def main():
         print()
         print("📁 생성된 파일:")
         print("  ./embedding_db/")
-        print()
-        print("💡 다음 단계:")
-        print("  python test_run.py  # 질문 테스트")
-        print("  python tests/test_dataset.py  # 벤치마크 테스트")
 
     except Exception as e:
         print()
