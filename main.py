@@ -12,6 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agents.graph import create_stats_chatbot_graph
+from database.vector_db import get_vectorstore, get_query_embeddings
+from database.metadata_manager import get_metadata_manager
 
 
 def print_header():
@@ -46,7 +48,19 @@ def main():
 
     # 그래프 초기화
     print("🔄 챗봇 초기화 중...")
+
+    # 1. MetadataManager 초기화
+    manager = get_metadata_manager()
+
+    # 2. 임베딩 모델 초기화
+    embeddings = get_query_embeddings()
+
+    # 3. 벡터스토어 초기화
+    vectorstore = get_vectorstore()
+
+    # 4. 그래프 초기화
     graph = create_stats_chatbot_graph()
+
     print("✅ 준비 완료!\n")
 
     # 대화 ID (세션 관리용)
@@ -87,6 +101,15 @@ def main():
             # 그래프 실행
             print("\n🤔 답변 생성 중...\n")
             final_state = graph.invoke(state, config=config)
+
+            # 시나리오 정보 출력
+            scenario_type = final_state.get("scenario_type", "unknown")
+            reasoning = final_state.get("reasoning", "")
+
+            print(f"🎯 시나리오: {scenario_type}")
+            if reasoning:
+                print(f"📝 분류 이유: {reasoning}")
+            print()
 
             # 결과 출력
             print_separator()
