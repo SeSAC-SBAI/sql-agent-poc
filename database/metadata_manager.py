@@ -82,6 +82,14 @@ class MetadataManager:
 키워드: {meta['keywords_ko']}
 기간: {meta['period_start']} ~ {meta['period_end']}
 """
+
+        # ===== 디버깅 추가 =====
+        if "migration" in table_name or "gender" in table_name:
+            print(f"\n[임베딩 문서] {table_name}:")
+            print(short_doc)
+            print("-" * 60)
+        # ===== 추가 끝 =====
+
         return short_doc.strip()
 
     def get_detailed_info(self, table_name: str) -> Optional[Dict]:
