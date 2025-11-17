@@ -25,9 +25,21 @@ def main():
     print("=" * 60)
     print()
 
+    persist_dir = Path("./embedding_db")
+    force_recreate = False
+
+    if persist_dir.exists():
+        print("⚠️  기존 벡터 DB가 존재합니다.")
+        confirm = input("삭제하고 새로 만들까요? (y/N): ")
+        if confirm.lower() == "y":
+            force_recreate = True
+        else:
+            print("❌ 취소됨. 기존 DB를 유지합니다.")
+            return
+
     try:
         # 벡터 DB 생성 (1~2분 소요)
-        vectorstore = setup_embedding_db()
+        vectorstore = setup_embedding_db(force_recreate=force_recreate)
 
         print()
         print("=" * 60)

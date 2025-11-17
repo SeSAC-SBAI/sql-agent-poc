@@ -56,17 +56,26 @@ def get_vectorstore():
     return _vectorstore
 
 
-def setup_embedding_db(db_path: str = None):
+def setup_embedding_db(db_path: str = None, force_recreate: bool = False):
     """
     DB에서 메타데이터 읽어서 벡터 DB 생성
 
     Args:
         db_path: DB 파일 경로
+        force_recreate: True면 기존 DB 삭제 후 재생성
 
     Returns:
         Chroma vectorstore
     """
+    import shutil
     from database.metadata_manager import get_metadata_manager
+
+    persist_dir = "./embedding_db"
+
+    if force_recreate and Path(persist_dir).exists():
+        print(f"⚠️  기존 벡터 DB 삭제 중: {persist_dir}")
+        shutil.rmtree(persist_dir)
+        print("✅ 삭제 완료")
 
     # 메타데이터 매니저
     manager = get_metadata_manager()
@@ -102,7 +111,7 @@ def setup_embedding_db(db_path: str = None):
         texts=documents,
         embedding=embeddings,
         metadatas=metadatas,
-        persist_directory="./embedding_db",
+        persist_directory=persist_dir,
     )
 
     print(f"✅ 벡터 DB 생성: {len(documents)}개 테이블")
