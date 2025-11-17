@@ -31,6 +31,11 @@ class StatsChatbotState(TypedDict):
 
     # 응답
     final_response: str  # 최종 응답 메시지
+    
+    # 신규 필드
+    output_style: Optional[str]        # "paper" / "report" / "blog" 등
+    styled_response: Optional[str]     # 스타일 적용 후 최종 답변
+    
 
     # 재시도 및 에러
     clarification_count: int  # 추가 정보 요청 재시도 횟수

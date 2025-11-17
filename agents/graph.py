@@ -11,6 +11,7 @@ from agents.nodes import (
     analyze_insight,
     plan_visualization,
     generate_response,
+    format_response,
 )
 
 
@@ -30,7 +31,8 @@ def create_stats_chatbot_graph():
     graph.add_node("analyze_insight", analyze_insight)
     graph.add_node("plan_visualization", plan_visualization)
     graph.add_node("generate_response", generate_response)
-
+    graph.add_node("format_response", format_response)
+    
     # 진입점 설정
     graph.set_entry_point("classify_intent")
 

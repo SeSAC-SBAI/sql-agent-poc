@@ -10,7 +10,12 @@ from agents.helpers import (
     get_llm_text,
 )
 from config.settings import settings
-from utils.prompts import CLASSIFY_INTENT_PROMPT
+from utils.prompts import (
+    CLASSIFY_INTENT_PROMPT,
+    REPORTER_RESPONSE_PROMPT,
+    PAPER_RESPONSE_PROMPT,
+    BLOG_RESPONSE_PROMPT,
+)
 
 
 def classify_intent(
@@ -394,7 +399,7 @@ def plan_visualization(
     return Command(goto="generate_response", update={"chart_spec": chart_spec})
 
 
-def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
+def generate_response(state: StatsChatbotState) -> Command[Literal["format_response", "__end__"]]:
     """
     9. 응답 생성 노드 (LLM 단계)
 
@@ -442,4 +447,108 @@ def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
         # Fallback: 간단한 응답
         final_response = f"조회 결과:\n{str(data)}\n\n{insight}"
 
-    return Command(goto=END, update={"final_response": final_response})
+    next_node = END
+    if state.get("output_style"):
+        next_node = "format_response"
+
+    return Command(
+        goto=next_node,
+        update={"final_response": final_response},
+    )
+
+def format_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
+    """
+    10. 응답 스타일 변환 노드
+
+    generate_response 에서 만든 final_response 를
+    기자/논문/블로그 스타일로 한 번 더 가공하는 단계.
+    """
+    # 1) 상태에서 기본 값 꺼내기
+    style = (state.get("output_style") or "default").lower()
+    base_answer = state.get("final_response", "")
+    user_query = state.get("user_query", "")
+
+    # 2) 스타일이 지정되지 않았으면 그냥 원본 그대로 종료
+    if style in ("default", "", None):
+        return Command(
+            goto=END,
+            update={
+                "styled_response": base_answer,
+            },
+        )
+
+    # 3) 스타일에 맞는 프롬프트 선택
+    if style in ("report", "reporter", "기자"):
+        prompt_tmpl = REPORTER_RESPONSE_PROMPT
+    elif style in ("paper", "논문"):
+        prompt_tmpl = PAPER_RESPONSE_PROMPT
+    elif style in ("blog", "블로그"):
+        prompt_tmpl = BLOG_RESPONSE_PROMPT
+    else:
+        # 알 수 없는 스타일이면 안전하게 원본 그대로 반환
+        return Command(
+            goto=END,
+            update={"styled_response": base_answer},
+        )
+
+    # 4) LLM 호출해서 스타일 변환
+    llm = get_llm_text()
+    prompt = prompt_tmpl.format(
+        user_query=user_query,
+        base_answer=base_answer,
+    )
+
+    try:
+        response = llm.invoke(prompt)
+        styled = response.content.strip()
+    except Exception as e:
+        print(f"스타일 변환 실패: {e}")
+        styled = base_answer
+
+    # 5) 변환된 결과를 styled_response 에 저장하고 종료
+    return Command(
+        goto=END,
+        update={"styled_response": styled},
+    )
+
+
+
+def format_answer_by_style(
+    *,
+    base_answer: str,
+    user_query: str,
+    style: str,
+) -> str:
+    """
+    최종 답변을 기자/논문/블로그 스타일로 변환하는 헬퍼 함수.
+
+    - LangGraph State랑 완전히 분리된, 독립 유틸리티 함수
+    - 버튼을 누르면 백엔드에서 이 함수만 호출해도 됨
+    """
+    llm = get_llm_text()
+    style = (style or "").lower()
+
+    # 스타일별 프롬프트 선택
+    if style in ("report", "reporter", "기자"):
+        prompt_tmpl = REPORTER_RESPONSE_PROMPT
+    elif style in ("paper", "논문"):
+        prompt_tmpl = PAPER_RESPONSE_PROMPT
+    elif style in ("blog", "블로그"):
+        prompt_tmpl = BLOG_RESPONSE_PROMPT
+    else:
+        # 모르는 스타일이면 그냥 원본 반환
+        return base_answer
+
+    prompt = prompt_tmpl.format(
+        user_query=user_query,
+        base_answer=base_answer,
+    )
+
+    try:
+        response = llm.invoke(prompt)
+        styled = response.content.strip()
+    except Exception as e:
+        print(f"[format_answer_by_style] 스타일 변환 실패: {e}")
+        styled = base_answer
+
+    return styled

@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agents.graph import create_stats_chatbot_graph
+from agents.nodes import format_answer_by_style
 
 
 def print_header():
@@ -97,7 +98,32 @@ def main():
             # 디버그 정보 (선택사항)
             if final_state.get("sql_query"):
                 print(f"🔍 실행된 SQL:\n{final_state['sql_query']}\n")
+            
+            # 스타일 테스트    
+            base_answer = final_state.get("final_response", "")
+            user_query = state.get("user_query", "")
+            
+             # 기본 답변이 있을 때만 스타일 변환 옵션 제공
+            if base_answer:
+                print("📰 기사, 📄 논문, 📝 블로그 형식으로 다시 보고 싶다면 스타일을 선택하세요.")
+                print("    - 기자 기사형: report")
+                print("    - 논문 요약형: paper")
+                print("    - 블로그 글:  blog")
+                style_choice = input("스타일 선택 (report/paper/blog, 그냥 엔터면 건너뜀): ").strip().lower()
 
+                if style_choice in ("report", "paper", "blog"):
+                    print("\n🎨 스타일 변환 중...\n")
+                    styled_answer = format_answer_by_style(
+                        base_answer=base_answer,
+                        user_query=user_query,
+                        style=style_choice,
+                    )
+
+                    print_separator()
+                    print(f"📋 스타일({style_choice}) 적용 답변:")
+                    print(styled_answer)
+                    print_separator()
+                
         except KeyboardInterrupt:
             print("\n\n👋 챗봇을 종료합니다.")
             break
