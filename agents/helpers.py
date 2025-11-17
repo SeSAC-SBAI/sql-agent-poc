@@ -37,7 +37,7 @@ def get_llm_text():
         model=settings.MODEL_NAME,
         temperature=settings.TEMPERATURE,
         google_api_key=settings.GOOGLE_API_KEY,
-        max_output_tokens=2048,
+        max_output_tokens=4096,
     )
 
 
