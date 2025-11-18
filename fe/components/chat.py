@@ -60,9 +60,31 @@ def render_chat():
             
             if metadata.get("chart_spec"):
                 from fe.components.visualization import create_chart
-                df = format_sql_result(metadata["query_result"])
-                if isinstance(df, pd.DataFrame) and not df.empty:
-                    chart = create_chart(df, metadata["chart_spec"])
+                
+                query_result = metadata["query_result"]
+                sql_query = metadata.get("sql_query", "")
+                chart_spec = metadata["chart_spec"]
+                
+                if isinstance(query_result, list) and query_result:
+                    if "SELECT" in sql_query.upper():
+                        select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
+                        col_names = [col.strip() for col in select_part.split(",")]
+                    else:
+                        col_names = [f"col_{i}" for i in range(len(query_result[0]))]
+                    
+                    df = pd.DataFrame(query_result, columns=col_names)
+                    df.columns = [str(col) for col in df.columns]
+                    
+                    if len(df.columns) == 1 and chart_spec.get("x_column") == "항목":
+                        df['항목'] = [f"값 {i+1}" for i in range(len(df))]
+                        
+                elif isinstance(query_result, pd.DataFrame):
+                    df = query_result
+                else:
+                    df = None
+                
+                if df is not None and not df.empty:
+                    chart = create_chart(df, chart_spec)
                     if chart:
                         st.plotly_chart(chart, use_container_width=True)
     
@@ -104,12 +126,11 @@ def handle_user_input(prompt: str, graph):
                 if final_state.get("chart_spec") and final_state.get("query_result"):
                     from fe.components.visualization import create_chart
                     
-                    # format_sql_result 쓰지 말고 직접 DataFrame 생성
                     query_result = final_state["query_result"]
                     sql_query = final_state.get("sql_query", "")
+                    chart_spec = final_state["chart_spec"]
                     
                     if isinstance(query_result, list) and query_result:
-                        # SQL에서 컬럼명 추출
                         if "SELECT" in sql_query.upper():
                             select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
                             col_names = [col.strip() for col in select_part.split(",")]
@@ -118,6 +139,11 @@ def handle_user_input(prompt: str, graph):
                         
                         df = pd.DataFrame(query_result, columns=col_names)
                         df.columns = [str(col) for col in df.columns]
+                        
+                        # 단일 컬럼인 경우 항목 컬럼 추가
+                        if len(df.columns) == 1 and chart_spec.get("x_column") == "항목":
+                            df['항목'] = [f"값 {i+1}" for i in range(len(df))]
+                            
                     elif isinstance(query_result, pd.DataFrame):
                         df = query_result
                     else:
@@ -126,8 +152,8 @@ def handle_user_input(prompt: str, graph):
                     print(f"[DEBUG handle_user_input] df.columns: {list(df.columns) if df is not None else 'None'}")
                     
                     if df is not None and not df.empty:
-                        print(f"[DEBUG] 차트 생성 중: {final_state['chart_spec']}")
-                        chart = create_chart(df, final_state["chart_spec"])
+                        print(f"[DEBUG] 차트 생성 중: {chart_spec}")
+                        chart = create_chart(df, chart_spec)
                         if chart:
                             st.plotly_chart(chart, use_container_width=True)
                         else:

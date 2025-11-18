@@ -103,7 +103,6 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
             # SELECT 절에서 컬럼명 추출
             if "SELECT" in sql_query.upper():
                 select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
-                # "행정구역, 값" -> ["행정구역", "값"]
                 col_names = [col.strip() for col in select_part.split(",")]
                 print(f"[DEBUG] 추출된 컬럼명: {col_names}")
             else:
@@ -130,6 +129,20 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
         sample_data = df.head(3).values.tolist()
         
         print(f"[DEBUG] plan_visualization - columns: {columns}, row_count: {row_count}")
+        
+        # 단일 컬럼인 경우 수동으로 차트 스펙 생성
+        if len(columns) == 1:
+            print(f"[DEBUG] 단일 컬럼 감지 - 막대 차트 생성")
+            # 인덱스를 x축으로 사용
+            df['항목'] = [f"값 {i+1}" for i in range(len(df))]
+            viz_metadata = {
+                "type": "bar",
+                "x_column": "항목",
+                "y_column": columns[0],
+                "title": question,
+                "description": "결과값"
+            }
+            return Command(goto="generate_response", update={"chart_spec": viz_metadata})
         
         if len(columns) < 2:
             print(f"[DEBUG] 컬럼 수 부족: {len(columns)}개")
