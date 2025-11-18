@@ -10,3 +10,4 @@ chromadb
 streamlit
 pytest
 sqlalchemy-libsql
+plotly
