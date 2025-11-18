@@ -7,10 +7,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from fe.utils.session import (
-    add_message, get_messages, get_thread_id, get_graph, set_graph
+from frontend.utils.session import (
+    add_message,
+    get_messages,
+    get_thread_id,
+    get_graph,
+    set_graph,
 )
-from fe.utils.format import format_sql_result, extract_sql_from_response
+from frontend.utils.format import format_sql_result, extract_sql_from_response
 from agents.graph import create_stats_chatbot_graph
 from database.vector_db import get_vectorstore, get_query_embeddings
 from database.metadata_manager import get_metadata_manager
@@ -30,82 +34,85 @@ def initialize_graph():
 
 def render_chat():
     """채팅 인터페이스 렌더링"""
-    
+
     graph = initialize_graph()
-    
+
     if "example_question" in st.session_state:
         prompt = st.session_state.example_question
         del st.session_state.example_question
         handle_user_input(prompt, graph)
         st.rerun()
-    
+
     if not get_messages():
         render_welcome_message()
-    
+
     for message in get_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            
+
             metadata = message.get("metadata", {})
-            
+
             if metadata.get("sql_query"):
                 with st.expander("실행된 SQL"):
                     st.code(metadata["sql_query"], language="sql")
-            
+
             if metadata.get("query_result"):
                 df = format_sql_result(metadata["query_result"])
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     with st.expander("데이터 테이블"):
                         st.dataframe(df, use_container_width=True)
-            
+
             if metadata.get("chart_spec"):
-                from fe.components.visualization import create_chart
-                
+                from frontend.components.visualization import create_chart
+
                 query_result = metadata["query_result"]
                 sql_query = metadata.get("sql_query", "")
                 chart_spec = metadata["chart_spec"]
-                
+
                 if isinstance(query_result, list) and query_result:
                     if "SELECT" in sql_query.upper():
-                        select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
+                        select_part = (
+                            sql_query.split("FROM")[0].replace("SELECT", "").strip()
+                        )
                         col_names = [col.strip() for col in select_part.split(",")]
                     else:
                         col_names = [f"col_{i}" for i in range(len(query_result[0]))]
-                    
+
                     df = pd.DataFrame(query_result, columns=col_names)
                     df.columns = [str(col) for col in df.columns]
-                    
+
                     if len(df.columns) == 1 and chart_spec.get("x_column") == "항목":
-                        df['항목'] = [f"값 {i+1}" for i in range(len(df))]
-                        
+                        df["항목"] = [f"값 {i+1}" for i in range(len(df))]
+
                 elif isinstance(query_result, pd.DataFrame):
                     df = query_result
                 else:
                     df = None
-                
+
                 if df is not None and not df.empty:
                     chart = create_chart(df, chart_spec)
                     if chart:
                         st.plotly_chart(chart, use_container_width=True)
-    
+
     if prompt := st.chat_input("통계 데이터에 대해 질문해보세요..."):
         handle_user_input(prompt, graph)
 
 
 def render_welcome_message():
     """웰컴 메시지 표시"""
-    from fe.components.welcome import render_welcome
+    from frontend.components.welcome import render_welcome
+
     render_welcome()
 
 
 def handle_user_input(prompt: str, graph):
     """사용자 입력 처리"""
-    
+
     add_message("user", prompt)
-    
+
     with st.chat_message("user"):
         st.markdown(prompt)
-    
+
     with st.chat_message("assistant"):
         with st.spinner("답변 생성 중..."):
             try:
@@ -114,43 +121,54 @@ def handle_user_input(prompt: str, graph):
                     "clarification_count": 0,
                     "sql_retry_count": 0,
                 }
-                
+
                 config = {"configurable": {"thread_id": get_thread_id()}}
-                
+
                 final_state = graph.invoke(state, config=config)
-                
-                response = final_state.get("final_response", "답변을 생성하지 못했습니다.")
+
+                response = final_state.get(
+                    "final_response", "답변을 생성하지 못했습니다."
+                )
                 st.markdown(response)
-                
+
                 # chart_spec이 있으면 시각화
                 if final_state.get("chart_spec") and final_state.get("query_result"):
-                    from fe.components.visualization import create_chart
-                    
+                    from frontend.components.visualization import create_chart
+
                     query_result = final_state["query_result"]
                     sql_query = final_state.get("sql_query", "")
                     chart_spec = final_state["chart_spec"]
-                    
+
                     if isinstance(query_result, list) and query_result:
                         if "SELECT" in sql_query.upper():
-                            select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
+                            select_part = (
+                                sql_query.split("FROM")[0].replace("SELECT", "").strip()
+                            )
                             col_names = [col.strip() for col in select_part.split(",")]
                         else:
-                            col_names = [f"col_{i}" for i in range(len(query_result[0]))]
-                        
+                            col_names = [
+                                f"col_{i}" for i in range(len(query_result[0]))
+                            ]
+
                         df = pd.DataFrame(query_result, columns=col_names)
                         df.columns = [str(col) for col in df.columns]
-                        
+
                         # 단일 컬럼인 경우 항목 컬럼 추가
-                        if len(df.columns) == 1 and chart_spec.get("x_column") == "항목":
-                            df['항목'] = [f"값 {i+1}" for i in range(len(df))]
-                            
+                        if (
+                            len(df.columns) == 1
+                            and chart_spec.get("x_column") == "항목"
+                        ):
+                            df["항목"] = [f"값 {i+1}" for i in range(len(df))]
+
                     elif isinstance(query_result, pd.DataFrame):
                         df = query_result
                     else:
                         df = None
-                    
-                    print(f"[DEBUG handle_user_input] df.columns: {list(df.columns) if df is not None else 'None'}")
-                    
+
+                    print(
+                        f"[DEBUG handle_user_input] df.columns: {list(df.columns) if df is not None else 'None'}"
+                    )
+
                     if df is not None and not df.empty:
                         print(f"[DEBUG] 차트 생성 중: {chart_spec}")
                         chart = create_chart(df, chart_spec)
@@ -158,19 +176,19 @@ def handle_user_input(prompt: str, graph):
                             st.plotly_chart(chart, use_container_width=True)
                         else:
                             print("[DEBUG] create_chart가 None 반환")
-                
+
                 # SQL 쿼리 표시
                 if final_state.get("sql_query"):
                     with st.expander("실행된 SQL"):
                         st.code(final_state["sql_query"], language="sql")
-                
+
                 # 데이터 테이블 표시
                 if final_state.get("query_result"):
                     df = format_sql_result(final_state["query_result"])
                     if isinstance(df, pd.DataFrame) and not df.empty:
                         with st.expander("데이터 테이블"):
                             st.dataframe(df, use_container_width=True)
-                
+
                 # 메타데이터 저장
                 metadata = {
                     "sql_query": final_state.get("sql_query"),
@@ -178,9 +196,9 @@ def handle_user_input(prompt: str, graph):
                     "chart_spec": final_state.get("chart_spec"),
                     "scenario_type": final_state.get("scenario_type"),
                 }
-                
+
                 add_message("assistant", response, metadata)
-                
+
             except Exception as e:
                 error_msg = f"오류가 발생했습니다: {str(e)}"
                 st.error(error_msg)

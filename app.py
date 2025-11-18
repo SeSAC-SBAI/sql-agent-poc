@@ -7,17 +7,17 @@ from pathlib import Path
 # 프로젝트 루트 경로 추가
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fe.utils.session import initialize_session
-from fe.styles.premium import apply_premium_style
-from fe.components.sidebar import render_sidebar
-from fe.components.chat import render_chat
+from frontend.utils.session import initialize_session
+from frontend.styles.premium import apply_premium_style
+from frontend.components.sidebar import render_sidebar
+from frontend.components.chat import render_chat
 
 # 페이지 설정
 st.set_page_config(
     page_title="통계청 SQL Agent",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # 프리미엄 스타일 적용
@@ -31,4 +31,3 @@ render_sidebar()
 
 # 메인 채팅 인터페이스
 render_chat()
-
