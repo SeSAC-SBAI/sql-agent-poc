@@ -43,6 +43,9 @@ ENV/
 *~
 .DS_Store
 
+# Streamlit
+.streamlit/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
