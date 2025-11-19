@@ -13,7 +13,7 @@ def render_sidebar():
     """사이드바 렌더링"""
 
     with st.sidebar:
-        st.title("Easysatat Q")
+        st.title("Easystat Q")
 
         st.markdown("---")
 
