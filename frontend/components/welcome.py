@@ -19,10 +19,16 @@ def render_welcome():
 
     st.markdown("### 💡 예시 질문")
 
-    cols = st.columns(min(len(EXAMPLE_QUESTIONS), 3))
-    for idx, question in enumerate(EXAMPLE_QUESTIONS):
-        col_idx = idx % 3
-        with cols[col_idx]:
-            if st.button(question, key=f"example_{idx}", use_container_width=True):
-                st.session_state.example_question = question
-                st.rerun()
+    # 질문들을 행 단위로 나누기 (3열씩)
+    num_cols = 3
+    for row_start in range(0, len(EXAMPLE_QUESTIONS), num_cols):
+        cols = st.columns(num_cols)
+        
+        for col_idx in range(num_cols):
+            question_idx = row_start + col_idx
+            if question_idx < len(EXAMPLE_QUESTIONS):
+                question = EXAMPLE_QUESTIONS[question_idx]
+                with cols[col_idx]:
+                    if st.button(question, key=f"example_{question_idx}", use_container_width=True):
+                        st.session_state.example_question = question
+                        st.rerun()

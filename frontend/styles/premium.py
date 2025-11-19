@@ -279,6 +279,7 @@ def apply_premium_style():
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         }
         
+
         /* 예시 질문 버튼 */
         div[data-testid="column"] .stButton button {
             background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -287,6 +288,10 @@ def apply_premium_style():
             font-weight: 600;
             text-align: left;
             padding: 14px 20px;
+            height: 80px !important;
+            min-height: 80px !important;
+            display: flex !important;
+            align-items: center !important;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         }
         
