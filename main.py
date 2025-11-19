@@ -121,6 +121,46 @@ def main():
             if final_state.get("sql_query"):
                 print(f"🔍 실행된 SQL:\n{final_state['sql_query']}\n")
 
+            # 콘텐츠 생성 옵션
+            while True:
+                choice = (
+                    input(
+                        "\n📝 다른 형식으로 변환하시겠습니까? (r:기자/p:논문/b:블로그/n:다음 질문): "
+                    )
+                    .strip()
+                    .lower()
+                )
+
+                if choice == "n":
+                    break
+                elif choice in ["r", "p", "b"]:
+                    from agents.nodes.content import format_answer_by_style
+
+                    style_map = {"r": "reporter", "p": "paper", "b": "blog"}
+                    style_name = {"r": "기자", "p": "논문", "b": "블로그"}
+
+                    additional = input("추가 요구사항 (없으면 엔터): ").strip()
+
+                    print(f"\n✍️ {style_name[choice]} 스타일 생성 중...\n")
+
+                    styled = format_answer_by_style(
+                        base_answer=final_state.get("final_response", ""),
+                        user_query=user_input,
+                        style=style_map[choice],
+                        style_request=additional if additional else None,
+                        query_result=final_state.get("query_result"),
+                        insight=final_state.get("insight"),
+                        processed_data=final_state.get("processed_data"),
+                        tables_info=final_state.get("tables_info"),
+                    )
+
+                    print_separator()
+                    print(f"📰 {style_name[choice]} 스타일:")
+                    print(styled)
+                    print_separator()
+                else:
+                    print("올바른 옵션을 선택하세요.")
+
         except KeyboardInterrupt:
             print("\n\n👋 챗봇을 종료합니다.")
             break

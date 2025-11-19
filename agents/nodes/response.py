@@ -9,7 +9,9 @@ from agents.helpers import get_llm_text
 from utils.prompts import RESPONSE_GENERATION_PROMPT
 
 
-def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
+def generate_response(
+    state: StatsChatbotState,
+) -> Command[Literal["__end__"]]:
     """
     9. 응답 생성 노드 (LLM 단계)
 
@@ -46,13 +48,17 @@ def generate_response(state: StatsChatbotState) -> Command[Literal["__end__"]]:
         # LLM 호출
         response = llm.invoke(prompt)
         final_response = response.content.strip()
-        
+
     except Exception as e:
         print(f"응답 생성 실패: {e}")
         print(f"State keys: {list(state.keys())}")
         # Fallback
         data = state.get("processed_data") or state.get("query_result") or "데이터 없음"
         insight = state.get("insight", "")
-        final_response = f"조회 결과:\n{str(data)}\n\n{insight}" if data != "데이터 없음" else "답변을 생성하지 못했습니다."
+        final_response = (
+            f"조회 결과:\n{str(data)}\n\n{insight}"
+            if data != "데이터 없음"
+            else "답변을 생성하지 못했습니다."
+        )
 
     return Command(goto=END, update={"final_response": final_response})
