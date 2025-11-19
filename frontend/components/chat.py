@@ -11,8 +11,6 @@ from frontend.utils.session import (
     add_message,
     get_messages,
     get_thread_id,
-    get_graph,
-    set_graph,
 )
 from frontend.utils.format import (
     format_sql_result,
@@ -20,20 +18,19 @@ from frontend.utils.format import (
     extract_column_names,
 )
 from agents.graph import create_stats_chatbot_graph
+from agents.nodes.content import format_answer_by_style
 from database.vector_db import get_vectorstore, get_query_embeddings
 from database.metadata_manager import get_metadata_manager
 
 
+@st.cache_resource
 def initialize_graph():
-    """그래프 초기화"""
-    if get_graph() is None:
-        with st.spinner("챗봇 초기화 중..."):
-            manager = get_metadata_manager()
-            embeddings = get_query_embeddings()
-            vectorstore = get_vectorstore()
-            graph = create_stats_chatbot_graph()
-            set_graph(graph)
-    return get_graph()
+    """그래프 초기화 (캐싱)"""
+    manager = get_metadata_manager()
+    embeddings = get_query_embeddings()
+    vectorstore = get_vectorstore()
+    graph = create_stats_chatbot_graph()
+    return graph
 
 
 def render_chat():
@@ -50,7 +47,7 @@ def render_chat():
     if not get_messages():
         render_welcome_message()
 
-    for message in get_messages():
+    for idx, message in enumerate(get_messages()):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
@@ -102,6 +99,75 @@ def render_chat():
         handle_user_input(prompt, graph)
 
 
+def render_content_buttons(message_idx: int, message: dict, metadata: dict):
+    """콘텐츠 생성 버튼 렌더링"""
+
+    st.markdown("---")
+    st.markdown("### 📝 다른 형식으로 변환")
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+
+    with col1:
+        if st.button(
+            "📰 기사", key=f"reporter_{message_idx}", use_container_width=True
+        ):
+            st.session_state[f"selected_style_{message_idx}"] = "reporter"
+            # st.rerun()
+
+    with col2:
+        if st.button("📄 논문", key=f"paper_{message_idx}", use_container_width=True):
+            st.session_state[f"selected_style_{message_idx}"] = "paper"
+            # st.rerun()
+
+    with col3:
+        if st.button("✍️ 블로그", key=f"blog_{message_idx}", use_container_width=True):
+            st.session_state[f"selected_style_{message_idx}"] = "blog"
+            # st.rerun()
+
+    # 스타일 선택되면 입력창 표시
+    selected_style = st.session_state.get(f"selected_style_{message_idx}")
+    if selected_style:
+        style_names = {"reporter": "기자", "paper": "논문", "blog": "블로그"}
+
+        st.markdown(f"**{style_names[selected_style]} 스타일 생성**")
+
+        style_request = st.text_input(
+            "추가 요구사항 (선택)",
+            key=f"request_{message_idx}",
+            placeholder="예: 객관적이고 간결하게",
+        )
+
+        if st.button("생성", key=f"generate_{message_idx}"):
+            with st.spinner(f"{style_names[selected_style]} 스타일 생성 중..."):
+                try:
+                    # 원본 질문 가져오기 (user 메시지)
+                    messages = get_messages()
+                    user_query = (
+                        messages[message_idx - 1]["content"] if message_idx > 0 else ""
+                    )
+
+                    styled_content = format_answer_by_style(
+                        base_answer=message["content"],
+                        user_query=user_query,
+                        style=selected_style,
+                        style_request=style_request if style_request else None,
+                        query_result=metadata.get("query_result"),
+                        insight=metadata.get("insight"),
+                        processed_data=metadata.get("processed_data"),
+                        tables_info=metadata.get("tables_info"),
+                    )
+
+                    st.markdown("---")
+                    st.markdown(f"**📰 {style_names[selected_style]} 스타일 결과**")
+                    st.markdown(styled_content)
+
+                    # 상태 초기화
+                    del st.session_state[f"selected_style_{message_idx}"]
+
+                except Exception as e:
+                    st.error(f"콘텐츠 생성 중 오류 발생: {str(e)}")
+
+
 def render_welcome_message():
     """웰컴 메시지 표시"""
     from frontend.components.welcome import render_welcome
@@ -123,10 +189,18 @@ def handle_user_input(prompt: str, graph):
     with st.chat_message("assistant"):
         with st.spinner("답변 생성 중..."):
             try:
+                # 대화 히스토리 생성 (최근 4개 메시지 = 2턴)
+                messages = get_messages()
+                conversation_history = "\n".join(
+                    [
+                        f"{msg['role']}: {msg['content']}"
+                        for msg in messages[-4:]  # 최근 2턴
+                    ]
+                )
+
                 state = {
                     "user_query": prompt,
-                    "clarification_count": 0,
-                    "sql_retry_count": 0,
+                    "conversation_history": conversation_history,
                 }
 
                 config = {"configurable": {"thread_id": get_thread_id()}}
@@ -154,7 +228,6 @@ def handle_user_input(prompt: str, graph):
                         df = pd.DataFrame(query_result, columns=col_names)
                         df.columns = [str(col) for col in df.columns]
 
-                        # 단일 컬럼인 경우 항목 컬럼 추가
                         if (
                             len(df.columns) == 1
                             and chart_spec.get("x_column") == "항목"
@@ -166,12 +239,7 @@ def handle_user_input(prompt: str, graph):
                     else:
                         df = None
 
-                    print(
-                        f"[DEBUG handle_user_input] df.columns: {list(df.columns) if df is not None else 'None'}"
-                    )
-
                     if df is not None and not df.empty:
-                        print(f"[DEBUG] 차트 생성 중: {chart_spec}")
                         chart = create_chart(df, chart_spec)
                         if chart:
                             st.plotly_chart(chart, use_container_width=True)
@@ -190,12 +258,15 @@ def handle_user_input(prompt: str, graph):
                         with st.expander("데이터 테이블"):
                             st.dataframe(df, use_container_width=True)
 
-                # 메타데이터 저장
+                # 메타데이터 저장 (콘텐츠 생성에 필요한 정보 추가)
                 metadata = {
                     "sql_query": final_state.get("sql_query"),
                     "query_result": final_state.get("query_result"),
                     "chart_spec": final_state.get("chart_spec"),
                     "scenario_type": final_state.get("scenario_type"),
+                    "insight": final_state.get("insight"),
+                    "processed_data": final_state.get("processed_data"),
+                    "tables_info": final_state.get("tables_info"),
                 }
 
                 add_message("assistant", response, metadata)
@@ -206,5 +277,4 @@ def handle_user_input(prompt: str, graph):
                 add_message("assistant", error_msg)
 
             finally:
-                # 처리 완료 (에러 발생해도 반드시 실행)
                 st.session_state.is_processing = False

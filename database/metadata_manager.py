@@ -11,6 +11,8 @@ import sqlite3
 import json
 from pathlib import Path
 from typing import Dict, List, Optional
+import streamlit as st
+
 
 PERIOD_COLUMN_MAP = {
     "month": "년월",
@@ -154,9 +156,10 @@ class MetadataManager:
 
 
 # 싱글톤 인스턴스
-_metadata_manager = None
+# _metadata_manager = None
 
 
+@st.cache_resource
 def get_metadata_manager() -> MetadataManager:
     """
     MetadataManager 싱글톤 인스턴스 반환
@@ -164,12 +167,13 @@ def get_metadata_manager() -> MetadataManager:
     Returns:
         MetadataManager 인스턴스
     """
-    global _metadata_manager
+    # global _metadata_manager
 
-    if _metadata_manager is None:
-        _metadata_manager = MetadataManager()
+    # if _metadata_manager is None:
+    #     _metadata_manager = MetadataManager()
 
-    return _metadata_manager
+    # return _metadata_manager
+    return MetadataManager()
 
 
 # 테스트 코드

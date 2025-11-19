@@ -3,6 +3,7 @@
 """
 
 import sys
+import streamlit as st
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -13,8 +14,8 @@ from langchain_upstage import UpstageEmbeddings
 from langchain_chroma import Chroma
 from config.settings import settings
 
-_query_embeddings = None
-_vectorstore = None
+# _query_embeddings = None
+# _vectorstore = None
 
 
 def get_passage_embeddings():
@@ -29,31 +30,39 @@ def get_passage_embeddings():
     )
 
 
+@st.cache_resource
 def get_query_embeddings():
     """질문 임베딩용 (검색 시 사용) - 캐싱"""
-    global _query_embeddings
+    # global _query_embeddings
 
-    if _query_embeddings is None:
-        _query_embeddings = UpstageEmbeddings(
-            api_key=settings.UPSTAGE_API_KEY, model="embedding-query"
-        )
-        print("📌 Query 임베딩 모델 로드 완료")
+    # if _query_embeddings is None:
+    #     _query_embeddings = UpstageEmbeddings(
+    #         api_key=settings.UPSTAGE_API_KEY, model="embedding-query"
+    #     )
+    #     print("📌 Query 임베딩 모델 로드 완료")
 
-    return _query_embeddings
+    # return _query_embeddings
+
+    print("📌 Query 임베딩 모델 로드 완료")
+    return UpstageEmbeddings(api_key=settings.UPSTAGE_API_KEY, model="embedding-query")
 
 
+@st.cache_resource
 def get_vectorstore():
     """벡터스토어 로드 (캐싱)"""
-    global _vectorstore
+    # global _vectorstore
 
-    if _vectorstore is None:
-        embeddings = get_query_embeddings()
-        _vectorstore = Chroma(
-            persist_directory="./embedding_db", embedding_function=embeddings
-        )
-        print("📌 벡터스토어 로드 완료")
+    # if _vectorstore is None:
+    #     embeddings = get_query_embeddings()
+    #     _vectorstore = Chroma(
+    #         persist_directory="./embedding_db", embedding_function=embeddings
+    #     )
+    #     print("📌 벡터스토어 로드 완료")
 
-    return _vectorstore
+    # return _vectorstore
+    embeddings = get_query_embeddings()
+    print("📌 벡터스토어 로드 완료")
+    return Chroma(persist_directory="./embedding_db", embedding_function=embeddings)
 
 
 def setup_embedding_db(db_path: str = None, force_recreate: bool = False):
