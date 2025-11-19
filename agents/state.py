@@ -12,6 +12,9 @@ class StatsChatbotState(TypedDict):
     scenario_type: str  # 시나리오 타입: "single_value", "table_view", "simple_aggregation", "derived_calculation", "multi_step_analysis", "out_of_scope"
     reasoning: Optional[str]
 
+    # 멀티턴 대화
+    conversation_history: Optional[str]  # 이전 대화 맥락
+
     # 테이블 검색
     tables_info: List[
         Dict[str, Any]

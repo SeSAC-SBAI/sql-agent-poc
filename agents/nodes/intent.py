@@ -25,12 +25,15 @@ def classify_intent(
     - out_of_scope: 범위 외 질문
     """
     user_query = state["user_query"]
+    conversation_history = state.get("conversation_history", "없음")
 
     # LLM 초기화
     llm = get_llm()
 
     # 프롬프트 포맷팅
-    prompt = CLASSIFY_INTENT_PROMPT.format(user_query=user_query)
+    prompt = CLASSIFY_INTENT_PROMPT.format(
+        conversation_history=conversation_history, user_query=user_query
+    )
 
     # LLM 호출
     response = llm.invoke(prompt)

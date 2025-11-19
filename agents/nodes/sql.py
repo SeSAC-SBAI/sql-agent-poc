@@ -20,6 +20,8 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
     # LLM 초기화
     llm = get_llm_text()
 
+    conversation_history = state.get("conversation_history", "없음")
+
     # 테이블 정보 포맷팅
     tables_info_str = "\n\n".join(
         [
@@ -42,6 +44,7 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
 
     # 프롬프트 포맷팅
     prompt = SQL_GENERATION_PROMPT.format(
+        conversation_history=conversation_history,
         user_query=state["user_query"],
         tables_info=tables_info_str,
         error_feedback=error_feedback,

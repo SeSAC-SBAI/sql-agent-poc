@@ -1,12 +1,20 @@
 import streamlit as st
 
 PREMIUM_COLORS = [
-    '#667eea', '#764ba2', '#f093fb', '#4facfe',
-    '#43e97b', '#fa709a', '#fee140', '#30cfd0'
+    "#667eea",
+    "#764ba2",
+    "#f093fb",
+    "#4facfe",
+    "#43e97b",
+    "#fa709a",
+    "#fee140",
+    "#30cfd0",
 ]
 
+
 def apply_premium_style():
-    st.markdown("""
+    st.markdown(
+        """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
@@ -110,6 +118,24 @@ def apply_premium_style():
             background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
             transform: translateY(-2px);
+        }
+        
+        /* 콘텐츠 생성 버튼 (채팅 메시지 내부) */
+        .stChatMessage .stButton button {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            color: #1a1a1a;
+            border: 2px solid #e1e4e8;
+            height: 60px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            width: 100%;
+        }
+        
+        .stChatMessage .stButton button:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
         }
         
         /* 제목 - 모던 타이포 */
@@ -336,5 +362,6 @@ def apply_premium_style():
             padding-top: 2rem;
         }
     </style>
-    """, unsafe_allow_html=True)
-
+    """,
+        unsafe_allow_html=True,
+    )
