@@ -15,7 +15,7 @@ def format_number(value: Any) -> str:
     """숫자를 포맷팅"""
     if value is None:
         return "-"
-    
+
     try:
         num = float(value)
         if num >= 1e9:
@@ -34,10 +34,10 @@ def format_table_for_display(df: pd.DataFrame, max_rows: int = 100) -> pd.DataFr
     """테이블 표시용 포맷팅"""
     if df.empty:
         return df
-    
+
     if len(df) > max_rows:
         return df.head(max_rows)
-    
+
     return df
 
 
@@ -57,3 +57,21 @@ def extract_sql_from_response(response: str) -> Optional[str]:
                 return sql
     return None
 
+
+def extract_column_names(sql_query: str, data_row_length: int) -> List[str]:
+    """
+    SQL 쿼리에서 컬럼명 추출
+
+    Args:
+        sql_query: SQL 쿼리 문자열
+        data_row_length: 데이터 행의 컬럼 개수
+
+    Returns:
+        추출된 컬럼명 리스트
+    """
+    if "SELECT" in sql_query.upper():
+        select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
+        col_names = [col.strip() for col in select_part.split(",")]
+    else:
+        col_names = [f"col_{i}" for i in range(data_row_length)]
+    return col_names
