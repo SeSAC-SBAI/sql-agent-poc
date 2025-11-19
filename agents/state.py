@@ -33,6 +33,11 @@ class StatsChatbotState(TypedDict):
     # 응답
     final_response: str  # 최종 응답 메시지
 
+    # 콘텐츠 생성 (기자/논문/블로그 스타일)
+    output_style: Optional[str]  # "report", "paper", "blog" 등
+    style_request: Optional[str]  # 사용자 추가 요구사항 (방향성, 톤 등)
+    styled_response: Optional[str]  # 스타일 적용된 최종 응답
+
     # 재시도 및 에러
     clarification_count: int  # 추가 정보 요청 재시도 횟수
     error: Optional[str]  # 일반 에러 메시지
