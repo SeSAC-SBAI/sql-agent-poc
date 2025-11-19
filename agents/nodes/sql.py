@@ -26,7 +26,10 @@ def generate_sql(state: StatsChatbotState) -> Command[Literal["execute_sql"]]:
             f"### {table['table_name']}\n"
             f"설명: {table['description']}\n"
             f"컬럼: {table['columns']}\n"
+            f"컬럼 상세: {table.get('column_detail', {})}\n"
             f"시간컬럼: {table.get('period_column', '년월')}\n"
+            f"기간: {table.get('period', 'N/A')}\n"
+            f"예시 쿼리: {table.get('example_queries', 'N/A')}\n"
             f"주의사항: {table.get('caution', '없음')}"
             for table in state["tables_info"]
         ]
