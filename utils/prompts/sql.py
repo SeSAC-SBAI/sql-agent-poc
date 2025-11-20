@@ -54,8 +54,11 @@ SELECT
 4. 동적 계산(INSTR, SUBSTR, CAST) 사용하지 말고 명시적으로 나열
 5. JOIN 사용 금지. 여러 테이블 데이터 결합은 서브쿼리 사용
 6. 행정구역 필터링: 질문에 "전국"이 없으면 WHERE 행정구역 != '전국' 필수
-7. 시점 미명시 시: 각 테이블의 시간컬럼(위 테이블 정보의 '시간컬럼' 참고)을 사용해 최신 데이터 조회
-   - 예: WHERE 년월 = (SELECT MAX(년월) FROM population_gender_stats)
+7. 시점 미명시 시: 시간컬럼과 값을 함께 조회하고, AS로 의미있는 별칭 지정
+   - 년월 테이블 예시: SELECT 년월, 값 AS 인구수 FROM population_gender_stats WHERE 년월 = (SELECT MAX(년월) FROM population_gender_stats)
+   - 년도 테이블 예시: SELECT 년도, 값 AS 사업체수 FROM ... WHERE 년도 = (SELECT MAX(년도) FROM ...)
+   - 중요: 값 컬럼에는 질문의 핵심 지표에 맞는 한글 별칭을 AS로 지정하세요
+   - 별칭 예시: 인구수, 세대수, 사업체수, 취업자수, 실업률 등
 
 ## 멀티턴 대화 처리:
 - 이전 대화에서 언급된 지역/연도/항목/테이블을 현재 질문에 반영하세요

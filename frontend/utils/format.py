@@ -59,22 +59,24 @@ def extract_sql_from_response(response: str) -> Optional[str]:
 
 
 def extract_column_names(sql_query: str, data_row_length: int) -> List[str]:
-    """
-    SQL 쿼리에서 컬럼명 추출
-
-    Args:
-        sql_query: SQL 쿼리 문자열
-        data_row_length: 데이터 행의 컬럼 개수
-
-    Returns:
-        추출된 컬럼명 리스트
-    """
+    """SQL 쿼리에서 컬럼명 추출"""
     if "SELECT" in sql_query.upper():
         select_part = sql_query.split("FROM")[0].replace("SELECT", "").strip()
         col_names = [col.strip() for col in select_part.split(",")]
+
+        # AS 별칭 처리
+        processed_names = []
+        for col in col_names:
+            if " AS " in col.upper():
+                # "값 AS 청년수" → "청년수"
+                alias = col.upper().split(" AS ")[1].strip()
+                processed_names.append(alias)
+            else:
+                processed_names.append(col)
+
+        return processed_names
     else:
-        col_names = [f"col_{i}" for i in range(data_row_length)]
-    return col_names
+        return [f"col_{i}" for i in range(data_row_length)]
 
 
 def style_dataframe_with_highlight(

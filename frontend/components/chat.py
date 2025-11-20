@@ -112,6 +112,25 @@ def render_chat():
                     else:
                         st.warning("차트 생성 중 오류가 발생했습니다.")
 
+            if message["role"] == "assistant" and metadata:
+                print(
+                    f"[DEBUG] 메시지 {idx}: assistant={message['role']=='assistant'}, metadata={bool(metadata)}"
+                )
+                print(
+                    f"[DEBUG] metadata keys: {list(metadata.keys()) if metadata else 'None'}"
+                )
+
+                if st.button("📊 컨텐츠 생성", key=f"extra_{idx}"):
+                    st.session_state[f"show_options_{idx}"] = True
+
+                if st.session_state.get(f"show_options_{idx}"):
+                    render_content_buttons(idx, message, metadata)
+
+            else:
+                print(
+                    f"[DEBUG] 메시지 {idx} 스킵: role={message['role']}, metadata={bool(metadata)}"
+                )
+
     is_processing = st.session_state.get("is_processing", False)
 
     if prompt := st.chat_input(
@@ -148,13 +167,15 @@ def render_content_buttons(message_idx: int, message: dict, metadata: dict):
 
         st.markdown(f"**{style_names[selected_style]} 스타일 생성**")
 
-        style_request = st.text_input(
-            "추가 요구사항 (선택)",
-            key=f"request_{message_idx}",
-            placeholder="예: 객관적이고 간결하게",
-        )
+        with st.form(key=f"content_form_{message_idx}"):
+            style_request = st.text_input(
+                "추가 요구사항 (선택)",
+                placeholder="예: 객관적이고 간결하게",
+            )
 
-        if st.button("생성", key=f"generate_{message_idx}"):
+            submitted = st.form_submit_button("생성")
+
+        if submitted:
             with st.spinner(f"{style_names[selected_style]} 스타일 생성 중..."):
                 try:
                     messages = get_messages()
@@ -271,9 +292,18 @@ def handle_user_input(prompt: str, graph):
                         sql_query = final_state.get("extended_sql") or final_state.get(
                             "sql_query", ""
                         )
+
+                        print(f"[DEBUG] SQL: {sql_query}")
+                        print(f"[DEBUG] 데이터 첫 행: {display_data[0]}")
+
                         col_names = extract_column_names(
                             sql_query, len(display_data[0])
                         )
+
+                        print(
+                            f"[DEBUG] 추출된 컬럼명: {col_names}, 실제 컬럼 수: {len(display_data[0])}"
+                        )
+
                         df = pd.DataFrame(display_data, columns=col_names)
                     else:
                         df = format_sql_result(display_data)
@@ -309,7 +339,8 @@ def handle_user_input(prompt: str, graph):
             except Exception as e:
                 error_msg = f"오류가 발생했습니다: {str(e)}"
                 st.error(error_msg)
-                add_message("assistant", error_msg)
+                add_message("assistant", error_msg, {})
 
             finally:
                 st.session_state.is_processing = False
+                st.rerun()

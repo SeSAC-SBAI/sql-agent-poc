@@ -245,6 +245,11 @@ def expand_sql_time_range(sql_query: str) -> tuple[Optional[str], Optional[str]]
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
 
+    # 서브쿼리 패턴 있으면 확장 안 함
+    if "SELECT MAX" in sql_query or "SELECT MIN" in sql_query:
+        print("[DEBUG] 서브쿼리 포함 - 확장 불가")
+        return None, None
+
     # 년월 패턴
     pattern_month = r"년월\s*=\s*['\"](\d{4}-\d{2})['\"]"
     match_month = re.search(pattern_month, sql_query)
