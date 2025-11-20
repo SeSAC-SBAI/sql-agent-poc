@@ -91,7 +91,17 @@ def create_line_chart(
         )
     )
 
-    apply_premium_layout(fig, title)
+    # y축 범위 자동 조정
+    y_min, y_max = df[y_col].min(), df[y_col].max()
+    y_range = y_max - y_min
+
+    # 변화율이 작으면 (범위가 평균의 10% 미만) y축 조정
+    if y_range / y_min < 0.1 if y_min > 0 else False:
+        y_range_adjusted = [y_min * 0.95, y_max * 1.05]
+    else:
+        y_range_adjusted = None  # Plotly 기본값 사용
+
+    apply_premium_layout(fig, title, y_range=y_range_adjusted)
     return fig
 
 
@@ -100,10 +110,26 @@ def create_bar_chart(df: pd.DataFrame, x_col: str, y_col: str, title: str) -> go
     print(f"[DEBUG create_bar_chart] 시작")
     fig = go.Figure()
 
+    # 막대 개수에 따라 너비 동적 조정
+    bar_count = len(df)
+    if bar_count == 1:
+        bar_width = 0.2  # 단일 막대는 적당히
+    elif bar_count <= 5:
+        bar_width = 0.4  # 적은 막대는 조금 더 굵게
+    elif bar_count <= 10:
+        bar_width = 0.3  # 많은 막대는 얇게
+    else:
+        bar_width = None  # 11개 이상은 Plotly 자동
+
+    print(f"[DEBUG] bar_count: {bar_count}, bar_width: {bar_width}")
+
+    x_values = [str(x) for x in df[x_col]]
+
     fig.add_trace(
         go.Bar(
-            x=df[x_col],
+            x=x_values,
             y=df[y_col],
+            width=bar_width,
             marker=dict(
                 color=df[y_col],
                 colorscale=[[0, "#667eea"], [1, "#764ba2"]],
@@ -113,8 +139,17 @@ def create_bar_chart(df: pd.DataFrame, x_col: str, y_col: str, title: str) -> go
         )
     )
 
+    # y축 범위 자동 조정
+    y_min, y_max = df[y_col].min(), df[y_col].max()
+    y_range = y_max - y_min
+
+    if y_range / y_min < 0.1 if y_min > 0 else False:
+        y_range_adjusted = [y_min * 0.95, y_max * 1.05]
+    else:
+        y_range_adjusted = None
+
     print(f"[DEBUG create_bar_chart] trace 추가 완료")
-    apply_premium_layout(fig, title)
+    apply_premium_layout(fig, title, y_range=y_range_adjusted)
     print(f"[DEBUG create_bar_chart] layout 적용 완료")
     return fig
 
@@ -138,8 +173,18 @@ def create_pie_chart(df: pd.DataFrame, x_col: str, y_col: str, title: str) -> go
     return fig
 
 
-def apply_premium_layout(fig: go.Figure, title: str):
+def apply_premium_layout(fig: go.Figure, title: str, y_range=None):
     """프리미엄 레이아웃 적용"""
+    yaxis_config = dict(
+        showgrid=True,
+        gridcolor="rgba(0,0,0,0.05)",
+        showline=False,
+        tickfont=dict(size=12, color="#495057"),
+    )
+
+    if y_range:
+        yaxis_config["range"] = y_range
+
     fig.update_layout(
         title=dict(text=title, font=dict(size=18, color="#1a1a1a", family="Inter")),
         plot_bgcolor="rgba(0,0,0,0)",
@@ -152,17 +197,13 @@ def apply_premium_layout(fig: go.Figure, title: str):
             bgcolor="white", font_size=13, font_family="Inter", bordercolor="#e1e4e8"
         ),
         xaxis=dict(
+            type="category",
             showgrid=False,
             showline=True,
             linecolor="#e1e4e8",
             tickfont=dict(size=12, color="#495057"),
         ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.05)",
-            showline=False,
-            tickfont=dict(size=12, color="#495057"),
-        ),
+        yaxis=yaxis_config,
     )
 
 
