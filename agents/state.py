@@ -24,6 +24,7 @@ class StatsChatbotState(TypedDict):
     sql_query: str  # 생성된 SQL 쿼리
     sql_retry_count: int  # SQL 생성 재시도 횟수
     sql_error: Optional[str]  # SQL 실행 에러 메시지
+    extended_sql: Optional[str]  # 확장된 SQL (시각화용)
 
     # 데이터
     query_result: List[Dict[str, Any]]  # SQL 실행 결과 데이터
@@ -32,6 +33,7 @@ class StatsChatbotState(TypedDict):
     # 분석 및 시각화
     insight: str  # 데이터 분석 인사이트 (경향, 패턴)
     chart_spec: Optional[Dict[str, Any]]  # 시각화 차트 스펙 (차트 타입, 데이터 등)
+    chart_data: Optional[List[Dict[str, Any]]]  # 시각화 전용 데이터 (확장된 데이터)
 
     # 응답
     final_response: str  # 최종 응답 메시지

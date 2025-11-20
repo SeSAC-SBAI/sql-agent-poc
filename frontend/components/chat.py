@@ -57,8 +57,10 @@ def render_chat():
                 with st.expander("실행된 SQL"):
                     st.code(metadata["sql_query"], language="sql")
 
+            # 데이터 테이블 - chart_data 우선 사용
             if metadata.get("query_result"):
-                df = format_sql_result(metadata["query_result"])
+                display_data = metadata.get("chart_data") or metadata["query_result"]
+                df = format_sql_result(display_data)
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     with st.expander("데이터 테이블"):
                         st.dataframe(df, use_container_width=False)
@@ -66,8 +68,11 @@ def render_chat():
             if metadata.get("chart_spec"):
                 from frontend.components.visualization import create_chart
 
-                query_result = metadata["query_result"]
-                sql_query = metadata.get("sql_query", "")
+                # chart_data와 extended_sql 사용
+                query_result = metadata.get("chart_data") or metadata["query_result"]
+                sql_query = metadata.get("extended_sql") or metadata.get(
+                    "sql_query", ""
+                )
                 chart_spec = metadata["chart_spec"]
 
                 if isinstance(query_result, list) and query_result:
@@ -75,9 +80,6 @@ def render_chat():
 
                     df = pd.DataFrame(query_result, columns=col_names)
                     df.columns = [str(col) for col in df.columns]
-
-                    if len(df.columns) == 1 and chart_spec.get("x_column") == "항목":
-                        df["항목"] = [f"값 {i+1}" for i in range(len(df))]
 
                 elif isinstance(query_result, pd.DataFrame):
                     df = query_result
@@ -112,19 +114,15 @@ def render_content_buttons(message_idx: int, message: dict, metadata: dict):
             "📰 기사", key=f"reporter_{message_idx}", use_container_width=True
         ):
             st.session_state[f"selected_style_{message_idx}"] = "reporter"
-            # st.rerun()
 
     with col2:
         if st.button("📄 논문", key=f"paper_{message_idx}", use_container_width=True):
             st.session_state[f"selected_style_{message_idx}"] = "paper"
-            # st.rerun()
 
     with col3:
         if st.button("✍️ 블로그", key=f"blog_{message_idx}", use_container_width=True):
             st.session_state[f"selected_style_{message_idx}"] = "blog"
-            # st.rerun()
 
-    # 스타일 선택되면 입력창 표시
     selected_style = st.session_state.get(f"selected_style_{message_idx}")
     if selected_style:
         style_names = {"reporter": "기자", "paper": "논문", "blog": "블로그"}
@@ -140,7 +138,6 @@ def render_content_buttons(message_idx: int, message: dict, metadata: dict):
         if st.button("생성", key=f"generate_{message_idx}"):
             with st.spinner(f"{style_names[selected_style]} 스타일 생성 중..."):
                 try:
-                    # 원본 질문 가져오기 (user 메시지)
                     messages = get_messages()
                     user_query = (
                         messages[message_idx - 1]["content"] if message_idx > 0 else ""
@@ -161,7 +158,6 @@ def render_content_buttons(message_idx: int, message: dict, metadata: dict):
                     st.markdown(f"**📰 {style_names[selected_style]} 스타일 결과**")
                     st.markdown(styled_content)
 
-                    # 상태 초기화
                     del st.session_state[f"selected_style_{message_idx}"]
 
                 except Exception as e:
@@ -178,7 +174,6 @@ def render_welcome_message():
 def handle_user_input(prompt: str, graph):
     """사용자 입력 처리"""
 
-    # 처리 시작
     st.session_state.is_processing = True
 
     add_message("user", prompt)
@@ -189,13 +184,9 @@ def handle_user_input(prompt: str, graph):
     with st.chat_message("assistant"):
         with st.spinner("답변 생성 중..."):
             try:
-                # 대화 히스토리 생성 (최근 4개 메시지 = 2턴)
                 messages = get_messages()
                 conversation_history = "\n".join(
-                    [
-                        f"{msg['role']}: {msg['content']}"
-                        for msg in messages[-4:]  # 최근 2턴
-                    ]
+                    [f"{msg['role']}: {msg['content']}" for msg in messages[-4:]]
                 )
 
                 state = {
@@ -213,11 +204,16 @@ def handle_user_input(prompt: str, graph):
                 st.markdown(response)
 
                 # chart_spec이 있으면 시각화
-                if final_state.get("chart_spec") and final_state.get("query_result"):
+                if final_state.get("chart_spec"):
                     from frontend.components.visualization import create_chart
 
-                    query_result = final_state["query_result"]
-                    sql_query = final_state.get("sql_query", "")
+                    # chart_data와 extended_sql 사용
+                    query_result = final_state.get("chart_data") or final_state.get(
+                        "query_result"
+                    )
+                    sql_query = final_state.get("extended_sql") or final_state.get(
+                        "sql_query", ""
+                    )
                     chart_spec = final_state["chart_spec"]
 
                     if isinstance(query_result, list) and query_result:
@@ -227,12 +223,6 @@ def handle_user_input(prompt: str, graph):
 
                         df = pd.DataFrame(query_result, columns=col_names)
                         df.columns = [str(col) for col in df.columns]
-
-                        if (
-                            len(df.columns) == 1
-                            and chart_spec.get("x_column") == "항목"
-                        ):
-                            df["항목"] = [f"값 {i+1}" for i in range(len(df))]
 
                     elif isinstance(query_result, pd.DataFrame):
                         df = query_result
@@ -251,17 +241,22 @@ def handle_user_input(prompt: str, graph):
                     with st.expander("실행된 SQL"):
                         st.code(final_state["sql_query"], language="sql")
 
-                # 데이터 테이블 표시
+                # 데이터 테이블 표시 - chart_data 우선 사용
                 if final_state.get("query_result"):
-                    df = format_sql_result(final_state["query_result"])
+                    display_data = (
+                        final_state.get("chart_data") or final_state["query_result"]
+                    )
+                    df = format_sql_result(display_data)
                     if isinstance(df, pd.DataFrame) and not df.empty:
                         with st.expander("데이터 테이블"):
                             st.dataframe(df, use_container_width=False)
 
-                # 메타데이터 저장 (콘텐츠 생성에 필요한 정보 추가)
+                # 메타데이터 저장
                 metadata = {
                     "sql_query": final_state.get("sql_query"),
                     "query_result": final_state.get("query_result"),
+                    "chart_data": final_state.get("chart_data"),
+                    "extended_sql": final_state.get("extended_sql"),  # 추가!
                     "chart_spec": final_state.get("chart_spec"),
                     "scenario_type": final_state.get("scenario_type"),
                     "insight": final_state.get("insight"),
