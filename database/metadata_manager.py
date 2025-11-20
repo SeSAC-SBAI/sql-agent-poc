@@ -128,6 +128,7 @@ class MetadataManager:
             "geo_level": meta.get("geo_level", ""),
             "time_freq": meta.get("time_freq", ""),
             "period_column": PERIOD_COLUMN_MAP.get(time_freq, "년월"),
+            "value_unit": meta.get("value_unit", ""),
         }
 
     def get_table_names(self) -> List[str]:

@@ -70,6 +70,7 @@ def analyze_insight(state: StatsChatbotState) -> Command[Literal["plan_visualiza
 
     데이터를 분석하여 경향, 패턴, 특이사항 파악
     - 예: "2020년 이후 감소하다가 2023년부터 회복"
+    - 단위 정보를 포함하여 정확한 수치 표현
     """
     # LLM 초기화
     llm = get_llm()
@@ -81,15 +82,31 @@ def analyze_insight(state: StatsChatbotState) -> Command[Literal["plan_visualiza
     else:
         data_to_analyze = state["query_result"]
 
+    # 단위 정보 추출 (첫 번째 테이블 기준)
+    value_unit = "단위 정보 없음"
+    if state.get("tables_info") and len(state["tables_info"]) > 0:
+        unit = state["tables_info"][0].get("value_unit", "")
+        if unit:
+            value_unit = f"이 데이터의 값 단위는 '{unit}'입니다."
+        else:
+            value_unit = "단위 정보가 명시되지 않았습니다."
+
+    print(f"[DEBUG] 단위 정보: {value_unit}")
+
     # 프롬프트 포맷팅
     prompt = INSIGHT_ANALYSIS_PROMPT.format(
-        user_query=state["user_query"], data=str(data_to_analyze)
+        user_query=state["user_query"],
+        data=str(data_to_analyze),
+        value_unit=value_unit,  # ← 단위 정보 추가!
     )
 
     # LLM 호출
     try:
         response = llm.invoke(prompt)
         insight = response.content.strip()
+
+        print(f"[DEBUG] 생성된 인사이트: {insight[:100]}...")
+
     except Exception as e:
         print(f"인사이트 분석 실패: {e}")
         insight = ""  # 실패 시 빈 문자열
