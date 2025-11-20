@@ -129,6 +129,8 @@ class MetadataManager:
             "time_freq": meta.get("time_freq", ""),
             "period_column": PERIOD_COLUMN_MAP.get(time_freq, "년월"),
             "value_unit": meta.get("value_unit", ""),
+            "org_id": meta.get("org_id", ""),
+            "tbl_id": meta.get("tbl_id", ""),
         }
 
     def get_table_names(self) -> List[str]:

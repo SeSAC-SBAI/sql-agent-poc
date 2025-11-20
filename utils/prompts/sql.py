@@ -47,9 +47,9 @@ SELECT
    WHERE 행정구역='서울특별시' AND 년월 BETWEEN '2024-01' AND '2024-06' 
    AND 연령대 IN ('60-64','65-69','70-74','75-79','80-84','85-89','90-94','95-99','100+') AND 항목='남자인구수') / 6.0;
 
-**예시 7: 괄호 포함 컬럼명 (중요)**
-질문: "2019년 제주 아파트 수는?"
-SQL: SELECT 값 FROM housing_type_sido_stats WHERE "행정구역별(읍면동)" = '제주특별자치도' AND 년도 = '2019' AND 주택종류 = '아파트';
+**예시 7: 계산식에 AS 별칭 (중요)**
+질문: "2018년 전북 한 세대당 평균 인원은?"
+SQL: SELECT (SELECT 값 FROM population_gender_stats WHERE 행정구역 = '전북특별자치도' AND 년월 = '2018-01' AND 항목 = '총인구수') / (SELECT 값 FROM population_stats WHERE 행정구역 = '전북특별자치도' AND 년월 = '2018-01') AS 평균인원수;
 
 ## 중요 규칙:
 1. 연령대는 숫자만 사용 (예: '20-24', NOT '20-24세')
@@ -61,8 +61,10 @@ SQL: SELECT 값 FROM housing_type_sido_stats WHERE "행정구역별(읍면동)" 
 7. 시점 미명시 시: 시간컬럼과 값을 함께 조회하고, AS로 의미있는 별칭 지정
    - 년월 테이블 예시: SELECT 년월, 값 AS 인구수 FROM population_gender_stats WHERE 년월 = (SELECT MAX(년월) FROM population_gender_stats)
    - 년도 테이블 예시: SELECT 년도, 값 AS 사업체수 FROM ... WHERE 년도 = (SELECT MAX(년도) FROM ...)
+   - **계산식 사용 시**: 반드시 AS로 별칭 지정 필수!
+     예: SELECT (A / B) AS 평균인원수 FROM ...
    - 중요: 값 컬럼에는 질문의 핵심 지표에 맞는 한글 별칭을 AS로 지정하세요
-   - 별칭 예시: 인구수, 세대수, 사업체수, 취업자수, 실업률 등
+   - 별칭 예시: 인구수, 세대수, 사업체수, 취업자수, 실업률, 평균인원수, 비율 등
 8. **단위 처리 (중요)**:
    - 테이블별 값의 단위는 테이블 정보에 명시되어 있습니다
    - SQL 쿼리 자체에서 단위 변환은 하지 마세요 (예: *1000 같은 연산 금지)
