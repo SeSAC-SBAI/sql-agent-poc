@@ -68,12 +68,12 @@ def render_chat():
             if metadata.get("chart_spec"):
                 from frontend.components.visualization import create_chart
 
-                # chart_data와 extended_sql 사용
                 query_result = metadata.get("chart_data") or metadata["query_result"]
                 sql_query = metadata.get("extended_sql") or metadata.get(
                     "sql_query", ""
                 )
                 chart_spec = metadata["chart_spec"]
+                target_value = metadata.get("target_value")
 
                 if isinstance(query_result, list) and query_result:
                     col_names = extract_column_names(sql_query, len(query_result[0]))
@@ -87,7 +87,7 @@ def render_chat():
                     df = None
 
                 if df is not None and not df.empty:
-                    chart = create_chart(df, chart_spec)
+                    chart = create_chart(df, chart_spec, target_value)
                     if chart:
                         st.plotly_chart(chart, use_container_width=True)
                     else:
@@ -207,7 +207,6 @@ def handle_user_input(prompt: str, graph):
                 if final_state.get("chart_spec"):
                     from frontend.components.visualization import create_chart
 
-                    # chart_data와 extended_sql 사용
                     query_result = final_state.get("chart_data") or final_state.get(
                         "query_result"
                     )
@@ -215,6 +214,7 @@ def handle_user_input(prompt: str, graph):
                         "sql_query", ""
                     )
                     chart_spec = final_state["chart_spec"]
+                    target_value = final_state.get("target_value")
 
                     if isinstance(query_result, list) and query_result:
                         col_names = extract_column_names(
@@ -230,7 +230,7 @@ def handle_user_input(prompt: str, graph):
                         df = None
 
                     if df is not None and not df.empty:
-                        chart = create_chart(df, chart_spec)
+                        chart = create_chart(df, chart_spec, target_value)
                         if chart:
                             st.plotly_chart(chart, use_container_width=True)
                         else:
@@ -256,7 +256,8 @@ def handle_user_input(prompt: str, graph):
                     "sql_query": final_state.get("sql_query"),
                     "query_result": final_state.get("query_result"),
                     "chart_data": final_state.get("chart_data"),
-                    "extended_sql": final_state.get("extended_sql"),  # 추가!
+                    "extended_sql": final_state.get("extended_sql"),
+                    "target_value": final_state.get("target_value"),
                     "chart_spec": final_state.get("chart_spec"),
                     "scenario_type": final_state.get("scenario_type"),
                     "insight": final_state.get("insight"),

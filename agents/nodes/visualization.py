@@ -87,16 +87,22 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
         if sql_result is None or not sql_result:
             return Command(
                 goto="generate_response",
-                update={"chart_spec": None, "chart_data": None, "extended_sql": None},
+                update={
+                    "chart_spec": None,
+                    "chart_data": None,
+                    "extended_sql": None,
+                    "target_value": None,
+                },
             )
 
         # 단일 값인 경우 SQL 확장
         chart_data = None
         extended_sql_used = None
+        target_value = None
 
         if len(sql_result) == 1:
             print("[DEBUG] 단일 값 감지 - SQL 확장 시도")
-            extended_sql = expand_sql_time_range(state.get("sql_query", ""))
+            extended_sql, target = expand_sql_time_range(state.get("sql_query", ""))
 
             if extended_sql:
                 from database.connection import db_manager
@@ -117,6 +123,7 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
                         sql_result = extended_result
                         chart_data = extended_result
                         extended_sql_used = extended_sql
+                        target_value = target
                     else:
                         print("[DEBUG] SQL 확장 결과 1개 이하, 원본 사용")
                         chart_data = sql_result
@@ -139,6 +146,7 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
                         "chart_spec": None,
                         "chart_data": None,
                         "extended_sql": None,
+                        "target_value": None,
                     },
                 )
 
@@ -161,7 +169,12 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
             print(f"[DEBUG] 지원하지 않는 타입: {type(sql_result)}")
             return Command(
                 goto="generate_response",
-                update={"chart_spec": None, "chart_data": None, "extended_sql": None},
+                update={
+                    "chart_spec": None,
+                    "chart_data": None,
+                    "extended_sql": None,
+                    "target_value": None,
+                },
             )
 
         columns = list(df.columns)
@@ -176,7 +189,12 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
             print(f"[DEBUG] 컬럼 수 부족: {len(columns)}개")
             return Command(
                 goto="generate_response",
-                update={"chart_spec": None, "chart_data": None, "extended_sql": None},
+                update={
+                    "chart_spec": None,
+                    "chart_data": None,
+                    "extended_sql": None,
+                    "target_value": None,
+                },
             )
 
         viz_metadata = determine_visualization(
@@ -193,7 +211,8 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
             update={
                 "chart_spec": viz_metadata,
                 "chart_data": chart_data,
-                "extended_sql": extended_sql_used,  # extended_sql 저장!
+                "extended_sql": extended_sql_used,
+                "target_value": target_value,
             },
         )
 
@@ -204,42 +223,74 @@ def plan_visualization(state: Dict[str, Any]) -> Command[Literal["generate_respo
         traceback.print_exc()
         return Command(
             goto="generate_response",
-            update={"chart_spec": None, "chart_data": None, "extended_sql": None},
+            update={
+                "chart_spec": None,
+                "chart_data": None,
+                "extended_sql": None,
+                "target_value": None,
+            },
         )
 
 
-def expand_sql_time_range(sql_query: str) -> Optional[str]:
+def expand_sql_time_range(sql_query: str) -> tuple[Optional[str], Optional[str]]:
     """
     단일 값 SQL을 시계열 범위로 확장
 
-    예: SELECT 값 FROM ... WHERE 년월 = '2023-01'
-    → SELECT 년월, 값 FROM ... WHERE 년월 BETWEEN '2022-01' AND '2024-01' ORDER BY 년월
+    Returns:
+        (확장된 SQL, 타겟 값)
     """
     import re
 
-    pattern = r"년월\s*=\s*['\"](\d{4}-\d{2})['\"]"
-    match = re.search(pattern, sql_query)
+    # 년월 패턴
+    pattern_month = r"년월\s*=\s*['\"](\d{4}-\d{2})['\"]"
+    match_month = re.search(pattern_month, sql_query)
 
-    if not match:
-        print("[DEBUG] 년월 패턴을 찾을 수 없음")
-        return None
+    # 년도 패턴
+    pattern_year = r"년도\s*=\s*['\"](\d{4})['\"]"
+    match_year = re.search(pattern_year, sql_query)
 
-    target_month = match.group(1)
-    year, month = target_month.split("-")
-    year = int(year)
+    if match_month:
+        # 월 단위 확장
+        target_value = match_month.group(1)
+        year, month = target_value.split("-")
+        year = int(year)
 
-    start = f"{year-1}-{month}"
-    end = f"{year+1}-{month}"
+        start = f"{year-1}-{month}"
+        end = f"{year+1}-{month}"
 
-    if "SELECT 년월" not in sql_query:
-        sql_query = sql_query.replace("SELECT ", "SELECT 년월, ", 1)
+        if "SELECT 년월" not in sql_query:
+            sql_query = sql_query.replace("SELECT ", "SELECT 년월, ", 1)
 
-    expanded_sql = re.sub(pattern, f"년월 BETWEEN '{start}' AND '{end}'", sql_query)
+        expanded_sql = re.sub(
+            pattern_month, f"년월 BETWEEN '{start}' AND '{end}'", sql_query
+        )
 
-    if "ORDER BY" not in expanded_sql:
-        expanded_sql = expanded_sql.rstrip(";") + " ORDER BY 년월;"
+        if "ORDER BY" not in expanded_sql:
+            expanded_sql = expanded_sql.rstrip(";") + " ORDER BY 년월;"
 
+    elif match_year:
+        # 년도 단위 확장
+        target_value = match_year.group(1)
+        year = int(target_value)
+
+        start = f"{year-2}"
+        end = f"{year+2}"
+
+        if "SELECT 년도" not in sql_query:
+            sql_query = sql_query.replace("SELECT ", "SELECT 년도, ", 1)
+
+        expanded_sql = re.sub(
+            pattern_year, f"년도 BETWEEN '{start}' AND '{end}'", sql_query
+        )
+
+        if "ORDER BY" not in expanded_sql:
+            expanded_sql = expanded_sql.rstrip(";") + " ORDER BY 년도;"
+    else:
+        print("[DEBUG] 년월/년도 패턴을 찾을 수 없음")
+        return None, None
+
+    print(f"[DEBUG] 타겟 값: {target_value}")
     print(f"[DEBUG] 원본 SQL: {sql_query}")
     print(f"[DEBUG] 확장 SQL: {expanded_sql}")
 
-    return expanded_sql
+    return expanded_sql, target_value

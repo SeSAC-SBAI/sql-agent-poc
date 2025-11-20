@@ -34,6 +34,7 @@ class StatsChatbotState(TypedDict):
     insight: str  # 데이터 분석 인사이트 (경향, 패턴)
     chart_spec: Optional[Dict[str, Any]]  # 시각화 차트 스펙 (차트 타입, 데이터 등)
     chart_data: Optional[List[Dict[str, Any]]]  # 시각화 전용 데이터 (확장된 데이터)
+    target_value: Optional[str]  # 원본 질문의 시점
 
     # 응답
     final_response: str  # 최종 응답 메시지
