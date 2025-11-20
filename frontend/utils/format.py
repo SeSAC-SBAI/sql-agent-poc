@@ -75,3 +75,27 @@ def extract_column_names(sql_query: str, data_row_length: int) -> List[str]:
     else:
         col_names = [f"col_{i}" for i in range(data_row_length)]
     return col_names
+
+
+def style_dataframe_with_highlight(
+    df: pd.DataFrame, target_value: Optional[str] = None
+):
+    """
+    DataFrame에 target_value 하이라이트 적용
+
+    Args:
+        df: DataFrame
+        target_value: 하이라이트할 값
+
+    Returns:
+        styled DataFrame 또는 원본 DataFrame
+    """
+    if not target_value:
+        return df
+
+    def highlight_target(row):
+        if str(row.iloc[0]) == target_value:
+            return ["background-color: #e3f2fd"] * len(row)
+        return [""] * len(row)
+
+    return df.style.apply(highlight_target, axis=1)

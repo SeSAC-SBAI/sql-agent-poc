@@ -11,3 +11,4 @@ streamlit
 pytest
 sqlalchemy-libsql
 plotly
+python-dateutil

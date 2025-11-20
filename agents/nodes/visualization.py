@@ -14,6 +14,8 @@ from utils.prompts import (
 )
 from frontend.utils.format import extract_column_names
 from agents.helpers import get_llm
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 def determine_visualization(
@@ -240,6 +242,8 @@ def expand_sql_time_range(sql_query: str) -> tuple[Optional[str], Optional[str]]
         (확장된 SQL, 타겟 값)
     """
     import re
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
 
     # 년월 패턴
     pattern_month = r"년월\s*=\s*['\"](\d{4}-\d{2})['\"]"
@@ -250,13 +254,15 @@ def expand_sql_time_range(sql_query: str) -> tuple[Optional[str], Optional[str]]
     match_year = re.search(pattern_year, sql_query)
 
     if match_month:
-        # 월 단위 확장
+        # 월 단위 확장 - 전후 3개월
         target_value = match_month.group(1)
-        year, month = target_value.split("-")
-        year = int(year)
+        target_date = datetime.strptime(target_value, "%Y-%m")
 
-        start = f"{year-1}-{month}"
-        end = f"{year+1}-{month}"
+        start_date = target_date - relativedelta(months=3)
+        end_date = target_date + relativedelta(months=3)
+
+        start = start_date.strftime("%Y-%m")
+        end = end_date.strftime("%Y-%m")
 
         if "SELECT 년월" not in sql_query:
             sql_query = sql_query.replace("SELECT ", "SELECT 년월, ", 1)
@@ -269,7 +275,7 @@ def expand_sql_time_range(sql_query: str) -> tuple[Optional[str], Optional[str]]
             expanded_sql = expanded_sql.rstrip(";") + " ORDER BY 년월;"
 
     elif match_year:
-        # 년도 단위 확장
+        # 년도 단위 확장 - 전후 2년 유지
         target_value = match_year.group(1)
         year = int(target_value)
 

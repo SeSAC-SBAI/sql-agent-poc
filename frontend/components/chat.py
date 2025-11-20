@@ -21,6 +21,7 @@ from agents.graph import create_stats_chatbot_graph
 from agents.nodes.content import format_answer_by_style
 from database.vector_db import get_vectorstore, get_query_embeddings
 from database.metadata_manager import get_metadata_manager
+from frontend.utils.format import style_dataframe_with_highlight
 
 
 @st.cache_resource
@@ -60,11 +61,29 @@ def render_chat():
             # 데이터 테이블 - chart_data 우선 사용
             if metadata.get("query_result"):
                 display_data = metadata.get("chart_data") or metadata["query_result"]
-                df = format_sql_result(display_data)
+
+                # DataFrame 변환 (extended_sql 기준으로 컬럼명 추출)
+                if isinstance(display_data, list) and display_data:
+                    sql_query = metadata.get("extended_sql") or metadata.get(
+                        "sql_query", ""
+                    )
+                    col_names = extract_column_names(sql_query, len(display_data[0]))
+                    df = pd.DataFrame(display_data, columns=col_names)
+                else:
+                    df = format_sql_result(display_data)
+
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     with st.expander("데이터 테이블"):
-                        st.dataframe(df, use_container_width=False)
-
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            target = metadata.get("target_value")
+                            styled_df = style_dataframe_with_highlight(df, target)
+                            st.dataframe(
+                                styled_df,
+                                hide_index=True,
+                                # height=400,
+                                use_container_width=True,
+                            )
             if metadata.get("chart_spec"):
                 from frontend.components.visualization import create_chart
 
@@ -246,11 +265,31 @@ def handle_user_input(prompt: str, graph):
                     display_data = (
                         final_state.get("chart_data") or final_state["query_result"]
                     )
-                    df = format_sql_result(display_data)
+
+                    # DataFrame 변환 (extended_sql 기준으로 컬럼명 추출)
+                    if isinstance(display_data, list) and display_data:
+                        sql_query = final_state.get("extended_sql") or final_state.get(
+                            "sql_query", ""
+                        )
+                        col_names = extract_column_names(
+                            sql_query, len(display_data[0])
+                        )
+                        df = pd.DataFrame(display_data, columns=col_names)
+                    else:
+                        df = format_sql_result(display_data)
+
                     if isinstance(df, pd.DataFrame) and not df.empty:
                         with st.expander("데이터 테이블"):
-                            st.dataframe(df, use_container_width=False)
-
+                            col1, col2, col3 = st.columns([1, 2, 1])
+                            with col2:
+                                target = final_state.get("target_value")
+                                styled_df = style_dataframe_with_highlight(df, target)
+                                st.dataframe(
+                                    styled_df,
+                                    hide_index=True,
+                                    # height=400,
+                                    use_container_width=True,
+                                )
                 # 메타데이터 저장
                 metadata = {
                     "sql_query": final_state.get("sql_query"),
