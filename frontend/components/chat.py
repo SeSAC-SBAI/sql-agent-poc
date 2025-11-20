@@ -61,7 +61,7 @@ def render_chat():
                 df = format_sql_result(metadata["query_result"])
                 if isinstance(df, pd.DataFrame) and not df.empty:
                     with st.expander("데이터 테이블"):
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, use_container_width=False)
 
             if metadata.get("chart_spec"):
                 from frontend.components.visualization import create_chart
@@ -256,7 +256,7 @@ def handle_user_input(prompt: str, graph):
                     df = format_sql_result(final_state["query_result"])
                     if isinstance(df, pd.DataFrame) and not df.empty:
                         with st.expander("데이터 테이블"):
-                            st.dataframe(df, use_container_width=True)
+                            st.dataframe(df, use_container_width=False)
 
                 # 메타데이터 저장 (콘텐츠 생성에 필요한 정보 추가)
                 metadata = {
